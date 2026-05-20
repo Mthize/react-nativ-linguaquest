@@ -68,10 +68,7 @@ export default function OnboardingScreen() {
           className="bg-lingua-purple rounded-2xl flex-row items-center justify-center mt-2 mb-6 py-4.5"
           activeOpacity={0.85}
           testID="get-started-button"
-          onPress={() => {
-            posthog.capture("onboarding_get_started_tapped");
-            router.push("/(auth)/sign-up");
-          }}
+          onPress={() => router.push("/sign-up")}
         >
           <Text className="font-poppins-semibold text-base text-white">
             Get Started
