@@ -1,7 +1,6 @@
 import SocialButton from "@/components/SocialButton";
 import VerificationModal from "@/components/VerificationModal";
 import { images } from "@/constants/images";
-import { useLanguageStore } from "@/store/languageStore";
 import { useSignIn, useSSO } from "@clerk/expo";
 import { AntDesign, FontAwesome, Ionicons } from "@expo/vector-icons";
 import * as Linking from "expo-linking";
@@ -28,7 +27,6 @@ type SSOStrategy = "oauth_google" | "oauth_facebook" | "oauth_apple";
 export default function SignInScreen() {
   const { signIn, errors, fetchStatus } = useSignIn();
   const { startSSOFlow } = useSSO();
-  const { selectedLanguage } = useLanguageStore();
 
   const [email, setEmail] = useState("");
   const [showVerification, setShowVerification] = useState(false);
@@ -38,33 +36,14 @@ export default function SignInScreen() {
 
   const handleSignIn = async () => {
     setAuthError("");
-    posthog.capture("sign_in_submitted", { method: "code" });
     const { error: createError } = await signIn.create({ identifier: email });
     if (createError) {
-      posthog.capture("$exception", {
-        $exception_list: [
-          {
-            type: createError.name ?? "SignInCreateError",
-            value: createError.message,
-          },
-        ],
-        $exception_source: "sign-in-create",
-      });
       setAuthError("We couldn't start sign in. Please try again.");
       return;
     }
 
     const { error } = await signIn.emailCode.sendCode({ emailAddress: email });
     if (error) {
-      posthog.capture("$exception", {
-        $exception_list: [
-          {
-            type: error.name ?? "SignInError",
-            value: error.message,
-          },
-        ],
-        $exception_source: "sign-in",
-      });
       setAuthError("We couldn't send your code. Please try again.");
       return;
     }
@@ -74,24 +53,9 @@ export default function SignInScreen() {
   const handleVerify = async (code: string) => {
     const { error } = await signIn.emailCode.verifyCode({ code });
     if (error) {
-      posthog.capture("$exception", {
-        $exception_list: [
-          {
-            type: error.name ?? "VerificationError",
-            value: error.message,
-          },
-        ],
-        $exception_source: "sign-in-verification",
-      });
       return;
     }
     if (signIn.status === "complete") {
-      posthog.capture("sign_in_completed", { method: "code" });
-      if (signIn.createdUserId) {
-        posthog.identify(signIn.createdUserId, {
-          $set: { preferred_language: selectedLanguage ?? null },
-        });
-      }
       await signIn.finalize({
         navigate: ({ decorateUrl }) => {
           router.replace(decorateUrl("/") as Href);
@@ -105,7 +69,6 @@ export default function SignInScreen() {
   };
 
   const handleSSO = async (strategy: SSOStrategy) => {
-    posthog.capture("sign_in_sso_started", { strategy });
     setAuthError("");
     try {
       const { createdSessionId, setActive } = await startSSOFlow({
@@ -113,18 +76,11 @@ export default function SignInScreen() {
         redirectUrl: Linking.createURL("/"),
       });
       if (createdSessionId && setActive) {
-        posthog.capture("sign_in_completed", { method: strategy });
         await setActive({ session: createdSessionId });
         router.replace("/");
       }
     } catch (err) {
-      const message =
-        err instanceof Error ? err.message : "Unknown SSO sign-in error";
       console.error("SSO sign-in failed", err);
-      posthog.capture("sign_in_sso_failed", {
-        strategy,
-        error: message,
-      });
       setAuthError("Couldn't continue with social sign in. Please try again.");
     }
   };

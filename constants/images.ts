@@ -6,6 +6,10 @@ import palace from "@/assets/images/palace.png";
 import streakFire from "@/assets/images/streak-fire.png";
 import treasure from "@/assets/images/treasure.png";
 
+const teacherPlaceholder = {
+  uri: "https://picsum.photos/seed/linguaquest-teacher/240/240",
+};
+
 export const images = {
   earth,
   mascotAuth,
@@ -13,5 +17,6 @@ export const images = {
   mascotLogo,
   palace,
   streakFire,
+  teacherPlaceholder,
   treasure,
 } as const;
