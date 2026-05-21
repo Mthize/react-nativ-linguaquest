@@ -1,9 +1,14 @@
 import SocialButton from "@/components/SocialButton";
-import { VerificationModal } from "@/components/verification-modal";
+import { VerificationModal } from "@/components/VerificationModal";
 import { images } from "@/constants/images";
+import { posthog } from "@/lib/posthog";
+import { useLanguageStore } from "@/store/language-store";
+import { useSignUp, useSSO } from "@clerk/expo";
 import { AntDesign, FontAwesome, Ionicons } from "@expo/vector-icons";
-import { router } from "expo-router";
-import { useState } from "react";
+import * as Linking from "expo-linking";
+import { type Href, router } from "expo-router";
+import * as WebBrowser from "expo-web-browser";
+import { useRef, useState } from "react";
 import {
   Image,
   KeyboardAvoidingView,
@@ -17,42 +22,129 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+WebBrowser.maybeCompleteAuthSession();
+
 type SSOStrategy = "oauth_google" | "oauth_facebook" | "oauth_apple";
 
 export default function SignUpScreen() {
+  const { signUp, errors, fetchStatus } = useSignUp();
+  const { startSSOFlow } = useSSO();
+  const { selectedLanguage } = useLanguageStore();
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [showVerification, setShowVerification] = useState(false);
   const [authError, setAuthError] = useState("");
+  const [ssoLoading, setSsoLoading] = useState(false);
+  const ssoInFlightRef = useRef(false);
 
-  const errors = {
-    fields: {} as {
-      code?: { message: string };
-      emailAddress?: { message: string };
-      password?: { message: string };
-    },
-    global: [] as { message: string }[],
-  };
-  const isLoading = false;
+  const isLoading = fetchStatus === "fetching";
 
   const handleSignUp = async () => {
     setAuthError("");
-    setShowVerification(true);
+    posthog.capture("sign_up_submitted", { method: "password" });
+    const { error } = await signUp.password({ emailAddress: email, password });
+    if (error) {
+      posthog.capture("$exception", {
+        $exception_list: [
+          {
+            type: error.name ?? "SignUpError",
+            value: error.message,
+          },
+        ],
+        $exception_source: "sign-up",
+      });
+      setAuthError("We couldn't create your account. Please try again.");
+      return;
+    }
+    try {
+      await signUp.verifications.sendEmailCode();
+      setShowVerification(true);
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : "Email code send failed";
+      posthog.capture("$exception", {
+        $exception_list: [
+          {
+            type: err instanceof Error ? err.name : "SignUpEmailCodeError",
+            value: message,
+          },
+        ],
+        $exception_source: "sign-up-email-code",
+      });
+      setAuthError(
+        "We couldn't send your verification code. Please try again.",
+      );
+    }
   };
 
   const handleVerify = async (code: string) => {
-    void code;
-    setShowVerification(false);
-    router.replace("/");
+    const { error } = await signUp.verifications.verifyEmailCode({ code });
+    if (error) {
+      posthog.capture("$exception", {
+        $exception_list: [
+          {
+            type: error.name ?? "VerificationError",
+            value: error.message,
+          },
+        ],
+        $exception_source: "sign-up-verification",
+      });
+      return;
+    }
+    if (signUp.status === "complete") {
+      posthog.capture("sign_up_completed", { method: "password" });
+      if (signUp.createdUserId) {
+        posthog.identify(signUp.createdUserId, {
+          $set_once: { signup_date: new Date().toISOString() },
+          $set: { preferred_language: selectedLanguage ?? null },
+        });
+      }
+      await signUp.finalize({
+        navigate: ({ decorateUrl }) => {
+          router.replace(decorateUrl("/") as Href);
+        },
+      });
+    }
   };
 
-  const handleResend = async () => {};
+  const handleResend = async () => {
+    await signUp.verifications.sendEmailCode();
+  };
 
   const handleSSO = async (strategy: SSOStrategy) => {
-    void strategy;
+    if (ssoInFlightRef.current) {
+      return;
+    }
+
+    ssoInFlightRef.current = true;
+    setSsoLoading(true);
+    posthog.capture("sign_up_sso_started", { strategy });
     setAuthError("");
-    setShowVerification(true);
+    try {
+      const { createdSessionId, setActive } = await startSSOFlow({
+        strategy,
+        redirectUrl: Linking.createURL("/"),
+      });
+      if (createdSessionId && setActive) {
+        posthog.capture("sign_up_completed", { method: strategy });
+        await setActive({ session: createdSessionId });
+        router.replace("/");
+      }
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : "Unknown SSO sign-up error";
+      console.error("SSO sign-up failed", err);
+      posthog.capture("sign_up_sso_failed", {
+        strategy,
+        error: message,
+      });
+      setAuthError("Couldn't continue with social sign up. Please try again.");
+    } finally {
+      ssoInFlightRef.current = false;
+      setSsoLoading(false);
+    }
   };
 
   return (
@@ -96,7 +188,7 @@ export default function SignUpScreen() {
               <TextInput
                 value={email}
                 onChangeText={setEmail}
-                placeholder="joey@example.com"
+                placeholder="alex@gmail.com"
                 placeholderTextColor="#9ca3af"
                 keyboardType="email-address"
                 autoCapitalize="none"
@@ -174,16 +266,19 @@ export default function SignUpScreen() {
             <SocialButton
               icon={<AntDesign name="google" size={20} color="#DB4437" />}
               label="Continue with Google"
+              disabled={ssoLoading}
               onPress={() => handleSSO("oauth_google")}
             />
             <SocialButton
               icon={<FontAwesome name="facebook" size={20} color="#1877F2" />}
               label="Continue with Facebook"
+              disabled={ssoLoading}
               onPress={() => handleSSO("oauth_facebook")}
             />
             <SocialButton
               icon={<AntDesign name="apple" size={20} color="#000" />}
               label="Continue with Apple"
+              disabled={ssoLoading}
               onPress={() => handleSSO("oauth_apple")}
             />
 
@@ -201,6 +296,8 @@ export default function SignUpScreen() {
               </TouchableOpacity>
             </View>
 
+            {/* Required for Clerk bot-protection */}
+            <View nativeID="clerk-captcha" />
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
