@@ -14,18 +14,19 @@ export default function Index() {
   );
 
   useEffect(() => {
-    if (languageHydrated) {
+    if (useLanguageStore.persist.hasHydrated()) {
+      setLanguageHydrated(true);
       return;
     }
 
     return useLanguageStore.persist.onFinishHydration(() =>
       setLanguageHydrated(true),
     );
-  }, [languageHydrated]);
+  }, []);
 
   if (!isLoaded || !languageHydrated) {
     return (
-      <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
+      <View className="flex-1 items-center justify-center">
         <ActivityIndicator size="large" color={colors.primary.purple} />
       </View>
     );

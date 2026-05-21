@@ -66,7 +66,7 @@ export default function CustomTabBar({
             <PlatformPressable
               key={route.key}
               accessibilityLabel={options.tabBarAccessibilityLabel}
-              accessibilityState={isFocused ? { selected: true } : {}}
+              accessibilityState={{ selected: isFocused }}
               href={buildHref(route.name, route.params)}
               onLongPress={onLongPress}
               onPress={onPress}

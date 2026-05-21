@@ -51,18 +51,42 @@ export default function VerificationModal({
   }, [error]);
 
   const handleCodeChange = async (text: string) => {
+    if (isSubmitting) {
+      return;
+    }
+
     const digits = text.replace(/[^0-9]/g, "").slice(0, 6);
     setCode(digits);
-    if (digits.length === 6 && !isSubmitting) {
+
+    if (digits.length === 6) {
       setIsSubmitting(true);
-      await onVerify(digits);
+
+      try {
+        await onVerify(digits);
+      } catch {
+        // Keep verification errors inside the modal flow.
+      } finally {
+        setIsSubmitting(false);
+      }
     }
   };
 
   const handleResend = async () => {
+    if (isSubmitting) {
+      return;
+    }
+
     setCode("");
-    await onResend();
-    setTimeout(() => inputRef.current?.focus(), 300);
+    setIsSubmitting(true);
+
+    try {
+      await onResend();
+    } catch {
+      // Keep resend errors inside the modal flow.
+    } finally {
+      setIsSubmitting(false);
+      setTimeout(() => inputRef.current?.focus(), 300);
+    }
   };
 
   return (
@@ -80,37 +104,45 @@ export default function VerificationModal({
           <View style={styles.overlay} />
         </TouchableWithoutFeedback>
 
-        <View style={styles.sheet}>
+        <View className="items-center rounded-t-[28px] bg-white px-6 pt-7 pb-10">
           {/* Close button */}
-          <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
+          <TouchableOpacity
+            onPress={onClose}
+            className="absolute top-4 right-5 p-1"
+          >
             <Ionicons name="close" size={22} color="#6b7280" />
           </TouchableOpacity>
 
-          <Text style={styles.title}>Check your email</Text>
-          <Text style={styles.subtitle}>
+          <Text className="mb-2 text-center font-poppins-semibold text-[22px] text-text-primary">
+            Check your email
+          </Text>
+          <Text className="body-md mb-8 text-center text-text-secondary">
             We sent a 6-digit code to{"\n"}
-            <Text style={styles.emailText}>{email || "your email"}</Text>
+            <Text className="font-poppins-medium text-text-primary">
+              {email || "your email"}
+            </Text>
           </Text>
 
           {/* Code boxes — tap to focus hidden input */}
           <TouchableOpacity
             activeOpacity={1}
             onPress={() => inputRef.current?.focus()}
-            style={styles.boxesRow}
+            className="mb-4 flex-row gap-2.5"
           >
             {Array.from({ length: 6 }).map((_, i) => (
               <View
                 key={i}
-                style={[
-                  styles.box,
+                className={`h-14 w-12 items-center justify-center rounded-[14px] border-[1.5px] ${
                   code[i]
-                    ? styles.boxFilled
+                    ? "border-lingua-purple bg-[#f5f2ff]"
                     : i === code.length
-                      ? styles.boxActive
-                      : styles.boxEmpty,
-                ]}
+                      ? "border-lingua-purple bg-white"
+                      : "border-border bg-white"
+                }`}
               >
-                <Text style={styles.boxText}>{code[i] ?? ""}</Text>
+                <Text className="font-poppins-semibold text-[20px] text-text-primary">
+                  {code[i] ?? ""}
+                </Text>
               </View>
             ))}
           </TouchableOpacity>
@@ -127,12 +159,18 @@ export default function VerificationModal({
           />
 
           {/* Error message */}
-          {error ? <Text style={styles.errorText}>{error}</Text> : null}
+          {error ? (
+            <Text className="body-sm mb-2 text-center text-error">
+              {error}
+            </Text>
+          ) : null}
 
-          <TouchableOpacity style={styles.resendBtn} onPress={handleResend}>
-            <Text style={styles.resendText}>
+          <TouchableOpacity className="mt-2 py-1" onPress={handleResend}>
+            <Text className="body-sm text-text-secondary">
               Didn&apos;t receive it?{" "}
-              <Text style={styles.resendLink}>Resend</Text>
+              <Text className="font-poppins-medium text-lingua-purple">
+                Resend
+              </Text>
             </Text>
           </TouchableOpacity>
         </View>
@@ -146,94 +184,10 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.45)",
   },
-  sheet: {
-    backgroundColor: "#fff",
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
-    paddingHorizontal: 24,
-    paddingTop: 28,
-    paddingBottom: 40,
-    alignItems: "center",
-  },
-  closeBtn: {
-    position: "absolute",
-    top: 16,
-    right: 20,
-    padding: 4,
-  },
-  title: {
-    fontFamily: "Poppins-SemiBold",
-    fontSize: 22,
-    color: "#001328",
-    marginBottom: 8,
-    textAlign: "center",
-  },
-  subtitle: {
-    fontFamily: "Poppins-Regular",
-    fontSize: 14,
-    color: "#6b7280",
-    textAlign: "center",
-    lineHeight: 22,
-    marginBottom: 32,
-  },
-  emailText: {
-    fontFamily: "Poppins-Medium",
-    color: "#001328",
-  },
-  boxesRow: {
-    flexDirection: "row",
-    gap: 10,
-    marginBottom: 16,
-  },
-  box: {
-    width: 48,
-    height: 56,
-    borderWidth: 1.5,
-    borderRadius: 14,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  boxEmpty: {
-    borderColor: "#e5e7eb",
-    backgroundColor: "#fff",
-  },
-  boxActive: {
-    borderColor: "#6c4ef5",
-    backgroundColor: "#fff",
-  },
-  boxFilled: {
-    borderColor: "#6c4ef5",
-    backgroundColor: "#f5f2ff",
-  },
-  boxText: {
-    fontFamily: "Poppins-SemiBold",
-    fontSize: 20,
-    color: "#001328",
-  },
   hiddenInput: {
     position: "absolute",
     opacity: 0,
     width: 1,
     height: 1,
-  },
-  errorText: {
-    fontFamily: "Poppins-Regular",
-    fontSize: 13,
-    color: "#ff4d4f",
-    textAlign: "center",
-    marginBottom: 8,
-  },
-  resendBtn: {
-    paddingVertical: 4,
-    marginTop: 8,
-  },
-  resendText: {
-    fontFamily: "Poppins-Regular",
-    fontSize: 13,
-    color: "#6b7280",
-  },
-  resendLink: {
-    fontFamily: "Poppins-Medium",
-    color: "#6c4ef5",
   },
 });
