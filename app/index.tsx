@@ -19,11 +19,21 @@ export default function Index() {
   };
 
   useEffect(() => {
-    if (languageHydrated) return;
-    return useLanguageStore.persist.onFinishHydration(() =>
-      setLanguageHydrated(true)
+    setLanguageHydrated(useLanguageStore.persist.hasHydrated());
+
+    const unsubscribeHydrate = useLanguageStore.persist.onHydrate(() =>
+      setLanguageHydrated(false)
     );
-  }, [languageHydrated]);
+    const unsubscribeFinishHydration =
+      useLanguageStore.persist.onFinishHydration(() =>
+        setLanguageHydrated(true)
+      );
+
+    return () => {
+      unsubscribeHydrate();
+      unsubscribeFinishHydration();
+    };
+  }, []);
 
   if (!isLoaded || !languageHydrated) {
     return (

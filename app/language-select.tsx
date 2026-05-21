@@ -93,38 +93,36 @@ export default function LanguageSelectScreen() {
         data={filtered}
         keyExtractor={(item) => item.code}
         renderItem={renderItem}
-        contentInsetAdjustmentBehavior="automatic"
         contentContainerStyle={styles.listContent}
-        showsVerticalScrollIndicator={false}
         ItemSeparatorComponent={() => (
           <View className="h-px bg-gray-200" />
         )}
-        ListFooterComponent={
-          <View>
-            <View className="px-4 pt-4 pb-3">
-              <TouchableOpacity
-                className="bg-lingua-purple rounded-2xl items-center py-4"
-                activeOpacity={0.85}
-                testID="language-confirm-button"
-                onPress={() => {
-                  setSelectedLanguage(selectedCode as LanguageCode);
-                  router.replace("/");
-                }}
-              >
-                <Text className="font-poppins-semibold text-base text-white">
-                  Continue
-                </Text>
-              </TouchableOpacity>
-            </View>
-
-            <Image
-              source={images.earth}
-              style={styles.earthImage}
-              resizeMode="cover"
-            />
-          </View>
-        }
       />
+
+      {/* Confirm button */}
+      <View className="px-4 pt-3 pb-3">
+        <TouchableOpacity
+          className="bg-lingua-purple rounded-2xl items-center py-4"
+          activeOpacity={0.85}
+          testID="language-confirm-button"
+          onPress={() => {
+            const selectedLang = LANGUAGES.find((l) => l.code === selectedCode);
+            posthog.capture("language_selected", {
+              language_code: selectedCode,
+              language_name: selectedLang?.name ?? selectedCode,
+            });
+            setSelectedLanguage(selectedCode as LanguageCode);
+            router.replace("/");
+          }}
+        >
+          <Text className="font-poppins-semibold text-base text-white">
+            Continue
+          </Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Earth image */}
+      <Image source={images.earth} style={styles.earthImage} resizeMode="cover" />
     </SafeAreaView>
   );
 }
@@ -147,7 +145,6 @@ const styles = StyleSheet.create({
   },
   listContent: {
     paddingHorizontal: 16,
-    paddingBottom: 8,
   },
   earthImage: {
     width: "100%",
