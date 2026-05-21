@@ -2,21 +2,11 @@ import { colors, fontFamily } from "@/constants/theme";
 import type { BottomTabBarProps } from "@react-navigation/bottom-tabs";
 import { PlatformPressable } from "@react-navigation/elements";
 import { useLinkBuilder } from "@react-navigation/native";
-import { useEffect, useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
-import Animated, {
-  Easing,
-  useAnimatedStyle,
-  useSharedValue,
-  withTiming,
-} from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-const ACTIVE_CIRCLE_SIZE = 54;
 const TAB_ICON_SIZE = 22;
-const TAB_BUTTON_HEIGHT = 62;
-const INNER_PADDING_HORIZONTAL = 4;
-const INNER_PADDING_TOP = 6;
+const TAB_BUTTON_HEIGHT = 58;
 
 export default function CustomTabBar({
   state,
@@ -25,34 +15,6 @@ export default function CustomTabBar({
 }: BottomTabBarProps) {
   const insets = useSafeAreaInsets();
   const { buildHref } = useLinkBuilder();
-  const [barWidth, setBarWidth] = useState(0);
-  const translateX = useSharedValue(0);
-
-  const tabWidth =
-    barWidth > 0
-      ? (barWidth - INNER_PADDING_HORIZONTAL * 2) / state.routes.length
-      : 0;
-
-  useEffect(() => {
-    if (!tabWidth) {
-      return;
-    }
-
-    translateX.value = withTiming(
-      INNER_PADDING_HORIZONTAL +
-        state.index * tabWidth +
-        (tabWidth - ACTIVE_CIRCLE_SIZE) / 2,
-      {
-        duration: 280,
-        easing: Easing.out(Easing.cubic),
-      },
-    );
-  }, [state.index, tabWidth, translateX]);
-
-  const indicatorStyle = useAnimatedStyle(() => ({
-    opacity: tabWidth ? 1 : 0,
-    transform: [{ translateX: translateX.value }],
-  }));
 
   return (
     <View
@@ -63,12 +25,7 @@ export default function CustomTabBar({
         },
       ]}
     >
-      <View style={styles.inner} onLayout={(event) => setBarWidth(event.nativeEvent.layout.width)}>
-        <Animated.View
-          pointerEvents="none"
-          style={[styles.activeIndicator, indicatorStyle]}
-        />
-
+      <View style={styles.inner}>
         {state.routes.map((route, index) => {
           const { options } = descriptors[route.key];
           const label =
@@ -80,7 +37,9 @@ export default function CustomTabBar({
           const isFocused = state.index === index;
           const icon = options.tabBarIcon?.({
             focused: isFocused,
-            color: isFocused ? "#ffffff" : colors.neutral.textSecondary,
+            color: isFocused
+              ? colors.primary.purple
+              : colors.neutral.textSecondary,
             size: TAB_ICON_SIZE,
           });
 
@@ -114,14 +73,17 @@ export default function CustomTabBar({
               style={styles.tabButton}
               testID={options.tabBarButtonTestID}
             >
-              {isFocused ? (
-                <View style={styles.activeSlot}>{icon}</View>
-              ) : (
-                <View style={styles.inactiveSlot}>
-                  {icon}
-                  <Text style={styles.inactiveLabel}>{label}</Text>
-                </View>
-              )}
+              <View style={styles.tabContent}>
+                {icon}
+                <Text
+                  style={[
+                    styles.label,
+                    isFocused ? styles.activeLabel : styles.inactiveLabel,
+                  ]}
+                >
+                  {label}
+                </Text>
+              </View>
             </PlatformPressable>
           );
         })}
@@ -132,33 +94,26 @@ export default function CustomTabBar({
 
 const styles = StyleSheet.create({
   shell: {
-    backgroundColor: "#ffffff",
+    backgroundColor: "#fbfbfd",
     borderTopWidth: 0,
-    paddingHorizontal: 14,
-    paddingTop: 10,
+    paddingHorizontal: 16,
+    paddingTop: 4,
   },
   inner: {
     flexDirection: "row",
-    alignItems: "flex-end",
+    alignItems: "center",
     justifyContent: "space-between",
-    borderRadius: 28,
+    borderRadius: 30,
     backgroundColor: "#ffffff",
-    paddingHorizontal: INNER_PADDING_HORIZONTAL,
-    paddingTop: 6,
-    paddingBottom: 4,
+    paddingHorizontal: 8,
+    paddingTop: 8,
+    paddingBottom: 8,
+    boxShadow: "0 -4px 20px rgba(17, 24, 39, 0.08)",
     shadowColor: "#1b1f3b",
     shadowOffset: { width: 0, height: -4 },
-    shadowOpacity: 0.05,
-    shadowRadius: 14,
-    elevation: 10,
-  },
-  activeIndicator: {
-    position: "absolute",
-    top: INNER_PADDING_TOP + (TAB_BUTTON_HEIGHT - ACTIVE_CIRCLE_SIZE) / 2,
-    width: ACTIVE_CIRCLE_SIZE,
-    height: ACTIVE_CIRCLE_SIZE,
-    borderRadius: ACTIVE_CIRCLE_SIZE / 2,
-    backgroundColor: colors.primary.purple,
+    shadowOpacity: 0.06,
+    shadowRadius: 16,
+    elevation: 12,
   },
   tabButton: {
     flex: 1,
@@ -166,21 +121,20 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  activeSlot: {
-    width: ACTIVE_CIRCLE_SIZE,
-    height: ACTIVE_CIRCLE_SIZE,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  inactiveSlot: {
+  tabContent: {
     alignItems: "center",
     justifyContent: "center",
     gap: 6,
   },
-  inactiveLabel: {
-    color: colors.neutral.textSecondary,
+  label: {
     fontFamily: fontFamily.medium,
     fontSize: 12,
     lineHeight: 14,
+  },
+  activeLabel: {
+    color: colors.primary.purple,
+  },
+  inactiveLabel: {
+    color: colors.neutral.textSecondary,
   },
 });

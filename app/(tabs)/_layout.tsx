@@ -16,8 +16,12 @@ export default function TabLayout() {
         name="home"
         options={{
           title: "Home",
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="home" size={size} color={color} />
+          tabBarIcon: ({ color, size, focused }) => (
+            <Ionicons
+              name={focused ? "home" : "home-outline"}
+              size={size}
+              color={color}
+            />
           ),
         }}
       />
@@ -25,8 +29,12 @@ export default function TabLayout() {
         name="learn"
         options={{
           title: "Learn",
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="book" size={size} color={color} />
+          tabBarIcon: ({ color, size, focused }) => (
+            <Ionicons
+              name={focused ? "book" : "book-outline"}
+              size={size}
+              color={color}
+            />
           ),
         }}
       />
@@ -34,8 +42,12 @@ export default function TabLayout() {
         name="ai-teacher"
         options={{
           title: "AI Teacher",
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="sparkles" size={size} color={color} />
+          tabBarIcon: ({ color, size, focused }) => (
+            <Ionicons
+              name={focused ? "headset" : "headset-outline"}
+              size={size}
+              color={color}
+            />
           ),
         }}
       />
@@ -43,9 +55,9 @@ export default function TabLayout() {
         name="chat"
         options={{
           title: "Chat",
-          tabBarIcon: ({ color, size }) => (
+          tabBarIcon: ({ color, size, focused }) => (
             <Ionicons
-              name="chatbubble-ellipses"
+              name={focused ? "chatbubble" : "chatbubble-outline"}
               size={size}
               color={color}
             />
@@ -56,8 +68,12 @@ export default function TabLayout() {
         name="profile"
         options={{
           title: "Profile",
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="person" size={size} color={color} />
+          tabBarIcon: ({ color, size, focused }) => (
+            <Ionicons
+              name={focused ? "person" : "person-outline"}
+              size={size}
+              color={color}
+            />
           ),
         }}
       />
