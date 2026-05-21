@@ -1,4 +1,5 @@
 import { images } from "@/constants/images";
+import { posthog } from "@/lib/posthog";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { Image, StyleSheet, Text, TouchableOpacity, View } from "react-native";
@@ -69,6 +70,7 @@ export default function OnboardingScreen() {
           activeOpacity={0.85}
           testID="get-started-button"
           onPress={() => {
+            posthog.capture("onboarding_get_started_clicked");
             router.push("/(auth)/sign-up");
           }}
         >

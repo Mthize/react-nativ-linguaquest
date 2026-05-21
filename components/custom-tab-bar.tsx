@@ -2,11 +2,21 @@ import { colors, fontFamily } from "@/constants/theme";
 import type { BottomTabBarProps } from "@react-navigation/bottom-tabs";
 import { PlatformPressable } from "@react-navigation/elements";
 import { useLinkBuilder } from "@react-navigation/native";
-import { StyleSheet, Text, View } from "react-native";
+import { useEffect, useRef, useState } from "react";
+import {
+  Animated,
+  Easing,
+  type LayoutChangeEvent,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-const TAB_ICON_SIZE = 22;
+const ACTIVE_INDICATOR_SIZE = 52;
+const TAB_BAR_HORIZONTAL_PADDING = 8;
 const TAB_BUTTON_HEIGHT = 58;
+const TAB_ICON_SIZE = 22;
 
 export default function CustomTabBar({
   state,
@@ -15,6 +25,35 @@ export default function CustomTabBar({
 }: BottomTabBarProps) {
   const insets = useSafeAreaInsets();
   const { buildHref } = useLinkBuilder();
+  const indicatorTranslateX = useRef(new Animated.Value(0)).current;
+  const [barWidth, setBarWidth] = useState(0);
+
+  const paddedBarWidth = Math.max(barWidth - TAB_BAR_HORIZONTAL_PADDING * 2, 0);
+  const tabWidth = paddedBarWidth > 0 ? paddedBarWidth / state.routes.length : 0;
+
+  useEffect(() => {
+    if (!tabWidth) {
+      return;
+    }
+
+    const nextTranslateX =
+      TAB_BAR_HORIZONTAL_PADDING +
+      state.index * tabWidth +
+      tabWidth / 2 -
+      ACTIVE_INDICATOR_SIZE / 2;
+
+    Animated.timing(indicatorTranslateX, {
+      duration: 220,
+      easing: Easing.out(Easing.cubic),
+      toValue: nextTranslateX,
+      useNativeDriver: true,
+    }).start();
+  }, [indicatorTranslateX, state.index, tabWidth]);
+
+  const handleBarLayout = (event: LayoutChangeEvent) => {
+    const { width } = event.nativeEvent.layout;
+    setBarWidth((currentWidth) => (currentWidth === width ? currentWidth : width));
+  };
 
   return (
     <View
@@ -25,7 +64,19 @@ export default function CustomTabBar({
         },
       ]}
     >
-      <View style={styles.inner}>
+      <View style={styles.inner} onLayout={handleBarLayout}>
+        {tabWidth ? (
+          <Animated.View
+            pointerEvents="none"
+            style={[
+              styles.activeIndicator,
+              {
+                transform: [{ translateX: indicatorTranslateX }],
+              },
+            ]}
+          />
+        ) : null}
+
         {state.routes.map((route, index) => {
           const { options } = descriptors[route.key];
           const label =
@@ -37,9 +88,7 @@ export default function CustomTabBar({
           const isFocused = state.index === index;
           const icon = options.tabBarIcon?.({
             focused: isFocused,
-            color: isFocused
-              ? colors.primary.purple
-              : colors.neutral.textSecondary,
+            color: isFocused ? "#ffffff" : colors.neutral.textSecondary,
             size: TAB_ICON_SIZE,
           });
 
@@ -74,15 +123,10 @@ export default function CustomTabBar({
               testID={options.tabBarButtonTestID}
             >
               <View style={styles.tabContent}>
-                {icon}
-                <Text
-                  style={[
-                    styles.label,
-                    isFocused ? styles.activeLabel : styles.inactiveLabel,
-                  ]}
-                >
-                  {label}
-                </Text>
+                <View style={styles.iconSlot}>{icon}</View>
+                {!isFocused ? (
+                  <Text style={[styles.label, styles.inactiveLabel]}>{label}</Text>
+                ) : null}
               </View>
             </PlatformPressable>
           );
@@ -93,11 +137,29 @@ export default function CustomTabBar({
 }
 
 const styles = StyleSheet.create({
-  shell: {
-    backgroundColor: "#fbfbfd",
-    borderTopWidth: 0,
-    paddingHorizontal: 16,
-    paddingTop: 4,
+  activeIndicator: {
+    position: "absolute",
+    top: 11,
+    left: 0,
+    height: ACTIVE_INDICATOR_SIZE,
+    width: ACTIVE_INDICATOR_SIZE,
+    borderRadius: ACTIVE_INDICATOR_SIZE / 2,
+    backgroundColor: colors.primary.purple,
+    boxShadow: "0 14px 28px rgba(108, 78, 245, 0.28)",
+    shadowColor: "#6c4ef5",
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.2,
+    shadowRadius: 16,
+    elevation: 10,
+  },
+  iconSlot: {
+    height: TAB_ICON_SIZE,
+    width: TAB_ICON_SIZE,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  inactiveLabel: {
+    color: colors.neutral.textSecondary,
   },
   inner: {
     flexDirection: "row",
@@ -105,7 +167,7 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     borderRadius: 30,
     backgroundColor: "#ffffff",
-    paddingHorizontal: 8,
+    paddingHorizontal: TAB_BAR_HORIZONTAL_PADDING,
     paddingTop: 8,
     paddingBottom: 8,
     boxShadow: "0 -4px 20px rgba(17, 24, 39, 0.08)",
@@ -115,26 +177,27 @@ const styles = StyleSheet.create({
     shadowRadius: 16,
     elevation: 12,
   },
-  tabButton: {
-    flex: 1,
-    height: TAB_BUTTON_HEIGHT,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  tabContent: {
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 6,
-  },
   label: {
     fontFamily: fontFamily.medium,
     fontSize: 12,
     lineHeight: 14,
   },
-  activeLabel: {
-    color: colors.primary.purple,
+  shell: {
+    backgroundColor: "#fbfbfd",
+    borderTopWidth: 0,
+    paddingHorizontal: 16,
+    paddingTop: 4,
   },
-  inactiveLabel: {
-    color: colors.neutral.textSecondary,
+  tabButton: {
+    flex: 1,
+    height: TAB_BUTTON_HEIGHT,
+    alignItems: "center",
+    justifyContent: "center",
+    zIndex: 1,
+  },
+  tabContent: {
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
   },
 });

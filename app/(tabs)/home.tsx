@@ -1,3 +1,4 @@
+import { posthog } from "@/lib/posthog";
 import { useAuth, useUser } from "@clerk/expo";
 import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
@@ -210,6 +211,12 @@ export default function HomeScreen() {
                     accessibilityRole="button"
                     className="mt-4 h-[50px] w-[126px] items-center justify-center rounded-[18px] bg-white"
                     style={styles.continueButtonShadow}
+                    onPress={() =>
+                      posthog.capture("continue_learning_clicked", {
+                        language: selectedLanguage.name,
+                        lesson_title: currentLesson.title,
+                      })
+                    }
                   >
                     <Text className="font-poppins-semibold text-[18px] leading-[22px] text-lingua-purple">
                       Continue
@@ -232,7 +239,10 @@ export default function HomeScreen() {
                 Today&apos;s plan
               </Text>
               <Link href="/learn" asChild>
-                <Pressable accessibilityRole="button">
+                <Pressable
+                  accessibilityRole="button"
+                  onPress={() => posthog.capture("view_all_lessons_clicked")}
+                >
                   <Text className="font-poppins-semibold text-[16px] leading-[22px] text-lingua-purple">
                     View all
                   </Text>
