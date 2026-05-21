@@ -1,14 +1,13 @@
 import SocialButton from "@/components/SocialButton";
-import { VerificationModal } from "@/components/VerificationModal";
+import VerificationModal from "@/components/VerificationModal";
 import { images } from "@/constants/images";
-import { posthog } from "@/lib/posthog";
-import { useLanguageStore } from "@/store/language-store";
+import { useLanguageStore } from "@/store/languageStore";
 import { useSignUp, useSSO } from "@clerk/expo";
 import { AntDesign, FontAwesome, Ionicons } from "@expo/vector-icons";
 import * as Linking from "expo-linking";
 import { type Href, router } from "expo-router";
 import * as WebBrowser from "expo-web-browser";
-import { useRef, useState } from "react";
+import { useState } from "react";
 import {
   Image,
   KeyboardAvoidingView,
@@ -36,8 +35,6 @@ export default function SignUpScreen() {
   const [showPassword, setShowPassword] = useState(false);
   const [showVerification, setShowVerification] = useState(false);
   const [authError, setAuthError] = useState("");
-  const [ssoLoading, setSsoLoading] = useState(false);
-  const ssoInFlightRef = useRef(false);
 
   const isLoading = fetchStatus === "fetching";
 
@@ -114,12 +111,6 @@ export default function SignUpScreen() {
   };
 
   const handleSSO = async (strategy: SSOStrategy) => {
-    if (ssoInFlightRef.current) {
-      return;
-    }
-
-    ssoInFlightRef.current = true;
-    setSsoLoading(true);
     posthog.capture("sign_up_sso_started", { strategy });
     setAuthError("");
     try {
@@ -141,9 +132,6 @@ export default function SignUpScreen() {
         error: message,
       });
       setAuthError("Couldn't continue with social sign up. Please try again.");
-    } finally {
-      ssoInFlightRef.current = false;
-      setSsoLoading(false);
     }
   };
 
@@ -266,19 +254,16 @@ export default function SignUpScreen() {
             <SocialButton
               icon={<AntDesign name="google" size={20} color="#DB4437" />}
               label="Continue with Google"
-              disabled={ssoLoading}
               onPress={() => handleSSO("oauth_google")}
             />
             <SocialButton
               icon={<FontAwesome name="facebook" size={20} color="#1877F2" />}
               label="Continue with Facebook"
-              disabled={ssoLoading}
               onPress={() => handleSSO("oauth_facebook")}
             />
             <SocialButton
               icon={<AntDesign name="apple" size={20} color="#000" />}
               label="Continue with Apple"
-              disabled={ssoLoading}
               onPress={() => handleSSO("oauth_apple")}
             />
 
