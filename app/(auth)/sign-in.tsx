@@ -1,9 +1,14 @@
 import SocialButton from "@/components/SocialButton";
-import { VerificationModal } from "@/components/verification-modal";
+import { VerificationModal } from "@/components/VerificationModal";
 import { images } from "@/constants/images";
+import { posthog } from "@/lib/posthog";
+import { useLanguageStore } from "@/store/language-store";
+import { useSignIn, useSSO } from "@clerk/expo";
 import { AntDesign, FontAwesome, Ionicons } from "@expo/vector-icons";
-import { router } from "expo-router";
-import { useState } from "react";
+import * as Linking from "expo-linking";
+import { type Href, router } from "expo-router";
+import * as WebBrowser from "expo-web-browser";
+import { useRef, useState } from "react";
 import {
   Image,
   KeyboardAvoidingView,
@@ -17,39 +22,124 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+WebBrowser.maybeCompleteAuthSession();
+
 type SSOStrategy = "oauth_google" | "oauth_facebook" | "oauth_apple";
 
 export default function SignInScreen() {
+  const { signIn, errors, fetchStatus } = useSignIn();
+  const { startSSOFlow } = useSSO();
+  const { selectedLanguage } = useLanguageStore();
+
   const [email, setEmail] = useState("");
   const [showVerification, setShowVerification] = useState(false);
   const [authError, setAuthError] = useState("");
+  const [ssoLoading, setSsoLoading] = useState(false);
+  const ssoInFlightRef = useRef(false);
 
-  const errors = {
-    fields: {} as {
-      code?: { message: string };
-      identifier?: { message: string };
-    },
-    global: [] as { message: string }[],
-  };
-  const isLoading = false;
+  const isLoading = fetchStatus === "fetching";
 
   const handleSignIn = async () => {
     setAuthError("");
+    posthog.capture("sign_in_submitted", { method: "code" });
+    const { error: createError } = await signIn.create({ identifier: email });
+    if (createError) {
+      posthog.capture("$exception", {
+        $exception_list: [
+          {
+            type: createError.name ?? "SignInCreateError",
+            value: createError.message,
+          },
+        ],
+        $exception_source: "sign-in-create",
+      });
+      setAuthError("We couldn't start sign in. Please try again.");
+      return;
+    }
+
+    const { error } = await signIn.emailCode.sendCode({ emailAddress: email });
+    if (error) {
+      posthog.capture("$exception", {
+        $exception_list: [
+          {
+            type: error.name ?? "SignInError",
+            value: error.message,
+          },
+        ],
+        $exception_source: "sign-in",
+      });
+      setAuthError("We couldn't send your code. Please try again.");
+      return;
+    }
     setShowVerification(true);
   };
 
   const handleVerify = async (code: string) => {
-    void code;
-    setShowVerification(false);
-    router.replace("/");
+    const { error } = await signIn.emailCode.verifyCode({ code });
+    if (error) {
+      posthog.capture("$exception", {
+        $exception_list: [
+          {
+            type: error.name ?? "VerificationError",
+            value: error.message,
+          },
+        ],
+        $exception_source: "sign-in-verification",
+      });
+      return;
+    }
+    if (signIn.status === "complete") {
+      posthog.capture("sign_in_completed", { method: "code" });
+      const createdUserId = (signIn as { createdUserId?: string }).createdUserId;
+      if (createdUserId) {
+        posthog.identify(createdUserId, {
+          $set: { preferred_language: selectedLanguage ?? null },
+        });
+      }
+      await signIn.finalize({
+        navigate: ({ decorateUrl }) => {
+          router.replace(decorateUrl("/") as Href);
+        },
+      });
+    }
   };
 
-  const handleResend = async () => {};
+  const handleResend = async () => {
+    await signIn.emailCode.sendCode({ emailAddress: email });
+  };
 
   const handleSSO = async (strategy: SSOStrategy) => {
-    void strategy;
+    if (ssoInFlightRef.current) {
+      return;
+    }
+
+    ssoInFlightRef.current = true;
+    setSsoLoading(true);
+    posthog.capture("sign_in_sso_started", { strategy });
     setAuthError("");
-    setShowVerification(true);
+    try {
+      const { createdSessionId, setActive } = await startSSOFlow({
+        strategy,
+        redirectUrl: Linking.createURL("/"),
+      });
+      if (createdSessionId && setActive) {
+        posthog.capture("sign_in_completed", { method: strategy });
+        await setActive({ session: createdSessionId });
+        router.replace("/");
+      }
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : "Unknown SSO sign-in error";
+      console.error("SSO sign-in failed", err);
+      posthog.capture("sign_in_sso_failed", {
+        strategy,
+        error: message,
+      });
+      setAuthError("Couldn't continue with social sign in. Please try again.");
+    } finally {
+      ssoInFlightRef.current = false;
+      setSsoLoading(false);
+    }
   };
 
   return (
@@ -141,16 +231,19 @@ export default function SignInScreen() {
             <SocialButton
               icon={<AntDesign name="google" size={20} color="#DB4437" />}
               label="Continue with Google"
+              disabled={ssoLoading}
               onPress={() => handleSSO("oauth_google")}
             />
             <SocialButton
               icon={<FontAwesome name="facebook" size={20} color="#1877F2" />}
               label="Continue with Facebook"
+              disabled={ssoLoading}
               onPress={() => handleSSO("oauth_facebook")}
             />
             <SocialButton
               icon={<AntDesign name="apple" size={20} color="#000" />}
               label="Continue with Apple"
+              disabled={ssoLoading}
               onPress={() => handleSSO("oauth_apple")}
             />
 
