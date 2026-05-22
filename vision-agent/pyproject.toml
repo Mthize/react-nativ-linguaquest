@@ -1,0 +1,13 @@
+[project]
+name = "linguaquest-vision-agent"
+version = "0.1.0"
+description = "Voice-only Vision Agents service for the LinguaQuest AI teacher."
+readme = "README.md"
+requires-python = ">=3.12,<3.14"
+dependencies = [
+    "python-dotenv>=1.1.1",
+    "vision-agents[getstream,openai]>=0.1.0",
+]
+
+[tool.uv]
+package = false

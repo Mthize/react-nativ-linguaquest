@@ -34,6 +34,9 @@ yarn-error.*
 .env
 .env*.local
 .evn
+vision-agent/.venv/
+vision-agent/.python-version
+vision-agent/__pycache__/
 
 # typescript
 *.tsbuildinfo
