@@ -1,6 +1,7 @@
 import SocialButton from "@/components/SocialButton";
 import VerificationModal from "@/components/VerificationModal";
 import { images } from "@/constants/images";
+import { posthog } from "@/lib/posthog";
 import { useSignIn, useSSO } from "@clerk/expo";
 import { AntDesign, FontAwesome, Ionicons } from "@expo/vector-icons";
 import * as Linking from "expo-linking";
@@ -36,9 +37,16 @@ export default function SignInScreen() {
 
   const handleSignIn = async () => {
     setAuthError("");
+    posthog.capture("sign_in_submitted", { method: "email" });
     const { error: createError } = await signIn.create({ identifier: email });
     if (createError) {
       setAuthError("We couldn't start sign in. Please try again.");
+      posthog.capture("$exception", {
+        $exception_list: [
+          { type: "SignInError", value: createError.message ?? "Sign in failed" },
+        ],
+        $exception_source: "sign-in",
+      });
       return;
     }
 
@@ -56,6 +64,10 @@ export default function SignInScreen() {
       return;
     }
     if (signIn.status === "complete") {
+      posthog.identify(email, {
+        $set: { email },
+      });
+      posthog.capture("sign_in_completed", { method: "email" });
       await signIn.finalize({
         navigate: ({ decorateUrl }) => {
           router.replace(decorateUrl("/") as Href);
@@ -70,6 +82,7 @@ export default function SignInScreen() {
 
   const handleSSO = async (strategy: SSOStrategy) => {
     setAuthError("");
+    posthog.capture("sign_in_sso_clicked", { provider: strategy });
     try {
       const { createdSessionId, setActive } = await startSSOFlow({
         strategy,
@@ -77,6 +90,7 @@ export default function SignInScreen() {
       });
       if (createdSessionId && setActive) {
         await setActive({ session: createdSessionId });
+        posthog.capture("sign_in_completed", { method: strategy });
         router.replace("/");
       }
     } catch (err) {

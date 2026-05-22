@@ -1,6 +1,7 @@
 import SocialButton from "@/components/SocialButton";
 import VerificationModal from "@/components/VerificationModal";
 import { images } from "@/constants/images";
+import { posthog } from "@/lib/posthog";
 import { useSignUp, useSSO } from "@clerk/expo";
 import { AntDesign, FontAwesome, Ionicons } from "@expo/vector-icons";
 import * as Linking from "expo-linking";
@@ -38,9 +39,16 @@ export default function SignUpScreen() {
 
   const handleSignUp = async () => {
     setAuthError("");
+    posthog.capture("sign_up_submitted", { method: "email" });
     const { error } = await signUp.password({ emailAddress: email, password });
     if (error) {
       setAuthError("We couldn't create your account. Please try again.");
+      posthog.capture("$exception", {
+        $exception_list: [
+          { type: "SignUpError", value: error.message ?? "Sign up failed" },
+        ],
+        $exception_source: "sign-up",
+      });
       return;
     }
     try {
@@ -59,6 +67,11 @@ export default function SignUpScreen() {
       return;
     }
     if (signUp.status === "complete") {
+      posthog.identify(signUp.emailAddress ?? email, {
+        $set: { email: signUp.emailAddress ?? email },
+        $set_once: { first_sign_up_date: new Date().toISOString() },
+      });
+      posthog.capture("sign_up_completed", { method: "email" });
       await signUp.finalize({
         navigate: ({ decorateUrl }) => {
           router.replace(decorateUrl("/") as Href);
@@ -73,6 +86,7 @@ export default function SignUpScreen() {
 
   const handleSSO = async (strategy: SSOStrategy) => {
     setAuthError("");
+    posthog.capture("sign_up_sso_clicked", { provider: strategy });
     try {
       const { createdSessionId, setActive } = await startSSOFlow({
         strategy,
@@ -80,6 +94,7 @@ export default function SignUpScreen() {
       });
       if (createdSessionId && setActive) {
         await setActive({ session: createdSessionId });
+        posthog.capture("sign_up_completed", { method: strategy });
         router.replace("/");
       }
     } catch (err) {
