@@ -2,7 +2,6 @@ import { Ionicons } from "@expo/vector-icons";
 import { Image, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 
 import { images } from "@/constants/images";
-import { colors } from "@/constants/theme";
 import { Lesson } from "@/types/learning";
 
 interface LessonCardProps {
@@ -35,15 +34,22 @@ export function LessonCard({
   return (
     <TouchableOpacity
       activeOpacity={0.8}
+      className={`flex-row items-center rounded-2xl border p-4 ${
+        isInProgress
+          ? "border-[#C4B5FD] bg-[#EDE9FE]"
+          : "border-border bg-white"
+      }`}
       onPress={onPress}
-      style={[styles.card, isInProgress && styles.cardInProgress]}
+      style={styles.cardShadow}
     >
       <View className="flex-1">
         <View className="flex-row items-center gap-2 mb-1">
           <Text className="caption">Lesson {index + 1}</Text>
           {isInProgress && (
-            <View style={styles.badge}>
-              <Text style={styles.badgeText}>In progress</Text>
+            <View className="rounded-full bg-[rgba(108,78,245,0.12)] px-2 py-0.5">
+              <Text className="font-poppins-medium text-[10px] text-lingua-purple">
+                In progress
+              </Text>
             </View>
           )}
         </View>
@@ -61,15 +67,15 @@ export function LessonCard({
       </View>
 
       {isCompleted && (
-        <View style={styles.checkCircle}>
+        <View className="ml-3 h-7 w-7 items-center justify-center rounded-full bg-[#21c16b]">
           <Ionicons name="checkmark" size={16} color="#fff" />
         </View>
       )}
 
       {isInProgress && (
         <Image
+          className="ml-3 h-14 w-[72px] rounded-[10px]"
           source={getLessonThumbnail(lesson)}
-          style={styles.thumbnail}
           resizeMode="cover"
         />
       )}
@@ -78,48 +84,11 @@ export function LessonCard({
 }
 
 const styles = StyleSheet.create({
-  card: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#fff",
-    borderRadius: 16,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: colors.neutral.border,
+  cardShadow: {
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.04,
     shadowRadius: 4,
     elevation: 1,
-  },
-  cardInProgress: {
-    backgroundColor: "#EDE9FE",
-    borderColor: "#C4B5FD",
-  },
-  badge: {
-    backgroundColor: "rgba(108, 78, 245, 0.12)",
-    borderRadius: 20,
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-  },
-  badgeText: {
-    fontSize: 10,
-    color: colors.primary.purple,
-    fontFamily: "Poppins-Medium",
-  },
-  checkCircle: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: colors.semantic.success,
-    alignItems: "center",
-    justifyContent: "center",
-    marginLeft: 12,
-  },
-  thumbnail: {
-    width: 72,
-    height: 56,
-    borderRadius: 10,
-    marginLeft: 12,
   },
 });

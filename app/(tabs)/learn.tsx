@@ -134,23 +134,23 @@ export default function LearnScreen() {
         </Text>
       </View>
 
-      <ScrollView
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.scrollContent}
-      >
-        {/* Hero Section */}
-        <View style={styles.heroContainer}>
-          <Image
-            source={images.palace}
-            contentFit="contain"
-            style={styles.heroImage}
-          />
-          <RNImage
-            source={images.mascotWelcome}
-            style={styles.mascotImage}
-            resizeMode="contain"
-          />
-        </View>
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={styles.scrollContent}
+        >
+          {/* Hero Section */}
+          <View className="mb-5 h-[180px] overflow-hidden rounded-[20px] bg-white">
+            <Image
+              source={images.palace}
+              contentFit="contain"
+              className="h-full w-full"
+            />
+            <RNImage
+              source={images.mascotWelcome}
+              className="absolute bottom-0 right-4 h-[110px] w-[110px]"
+              resizeMode="contain"
+            />
+          </View>
 
         {/* Lessons / Practice tabs */}
         <View className="flex-row border-b border-border mb-5">
@@ -200,23 +200,5 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingHorizontal: 20,
     paddingBottom: 100,
-  },
-  heroContainer: {
-    height: 180,
-    borderRadius: 20,
-    overflow: "hidden",
-    marginBottom: 20,
-    backgroundColor: "#ffffff",
-  },
-  heroImage: {
-    width: "100%",
-    height: "100%",
-  },
-  mascotImage: {
-    position: "absolute",
-    bottom: 0,
-    right: 16,
-    width: 110,
-    height: 110,
   },
 });

@@ -19,9 +19,16 @@ export const useLearningStore = create<LearningState>()(
       streak: 12,
       completedLessonIds: [],
       addXP: (amount) =>
-        set((state) => ({
-          xpToday: Math.min(state.xpToday + amount, state.dailyGoal),
-        })),
+        set((state) => {
+          const clampedAmount = Math.max(amount, 0);
+
+          return {
+            xpToday: Math.min(
+              Math.max(state.xpToday + clampedAmount, 0),
+              state.dailyGoal
+            ),
+          };
+        }),
       completeLesson: (lessonId) =>
         set((state) => ({
           completedLessonIds: state.completedLessonIds.includes(lessonId)
