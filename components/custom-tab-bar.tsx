@@ -1,4 +1,4 @@
-import { colors, fontFamily } from "@/constants/theme";
+import { colors } from "@/constants/theme";
 import type { BottomTabBarProps } from "@react-navigation/bottom-tabs";
 import { PlatformPressable } from "@react-navigation/elements";
 import { useLinkBuilder } from "@react-navigation/native";
@@ -7,7 +7,6 @@ import {
   Animated,
   Easing,
   type LayoutChangeEvent,
-  StyleSheet,
   Text,
   View,
 } from "react-native";
@@ -15,7 +14,6 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 const ACTIVE_INDICATOR_SIZE = 52;
 const TAB_BAR_HORIZONTAL_PADDING = 8;
-const TAB_BUTTON_HEIGHT = 58;
 const TAB_ICON_SIZE = 22;
 
 export default function CustomTabBar({
@@ -57,23 +55,38 @@ export default function CustomTabBar({
 
   return (
     <View
+      className="bg-[#fbfbfd] px-4 pt-1"
       style={[
-        styles.shell,
         {
           paddingBottom: Math.max(insets.bottom, 12),
         },
       ]}
     >
-      <View style={styles.inner} onLayout={handleBarLayout}>
+      <View
+        className="relative flex-row items-center justify-between rounded-[30px] bg-white px-2 py-2"
+        onLayout={handleBarLayout}
+        style={{
+          boxShadow: "0 -4px 20px rgba(17, 24, 39, 0.08)",
+          shadowColor: "#1b1f3b",
+          shadowOffset: { width: 0, height: -4 },
+          shadowOpacity: 0.06,
+          shadowRadius: 16,
+          elevation: 12,
+        }}
+      >
         {tabWidth ? (
           <Animated.View
+            className="absolute left-0 top-[11px] h-[52px] w-[52px] rounded-full bg-lingua-purple"
             pointerEvents="none"
-            style={[
-              styles.activeIndicator,
-              {
-                transform: [{ translateX: indicatorTranslateX }],
-              },
-            ]}
+            style={{
+              boxShadow: "0 14px 28px rgba(108, 78, 245, 0.28)",
+              shadowColor: "#6c4ef5",
+              shadowOffset: { width: 0, height: 10 },
+              shadowOpacity: 0.2,
+              shadowRadius: 16,
+              elevation: 10,
+              transform: [{ translateX: indicatorTranslateX }],
+            }}
           />
         ) : null}
 
@@ -112,92 +125,32 @@ export default function CustomTabBar({
           };
 
           return (
-            <PlatformPressable
-              key={route.key}
-              accessibilityLabel={options.tabBarAccessibilityLabel}
-              accessibilityState={{ selected: isFocused }}
-              href={buildHref(route.name, route.params)}
-              onLongPress={onLongPress}
-              onPress={onPress}
-              style={styles.tabButton}
-              testID={options.tabBarButtonTestID}
-            >
-              <View style={styles.tabContent}>
-                <View style={styles.iconSlot}>{icon}</View>
-                {!isFocused ? (
-                  <Text style={[styles.label, styles.inactiveLabel]}>{label}</Text>
-                ) : null}
-              </View>
-            </PlatformPressable>
+            <View key={route.key} className="flex-1" style={{ zIndex: 1 }}>
+              <PlatformPressable
+                accessibilityLabel={options.tabBarAccessibilityLabel}
+                accessibilityState={{ selected: isFocused }}
+                href={buildHref(route.name, route.params)}
+                onLongPress={onLongPress}
+                onPress={onPress}
+                testID={options.tabBarButtonTestID}
+              >
+                <View className="h-[58px] items-center justify-center">
+                  <View className="items-center justify-center gap-1.5">
+                    <View className="h-[22px] w-[22px] items-center justify-center">
+                      {icon}
+                    </View>
+                    {!isFocused ? (
+                      <Text className="font-poppins-medium text-[12px] leading-[14px] text-text-secondary">
+                        {label}
+                      </Text>
+                    ) : null}
+                  </View>
+                </View>
+              </PlatformPressable>
+            </View>
           );
         })}
       </View>
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  activeIndicator: {
-    position: "absolute",
-    top: 11,
-    left: 0,
-    height: ACTIVE_INDICATOR_SIZE,
-    width: ACTIVE_INDICATOR_SIZE,
-    borderRadius: ACTIVE_INDICATOR_SIZE / 2,
-    backgroundColor: colors.primary.purple,
-    boxShadow: "0 14px 28px rgba(108, 78, 245, 0.28)",
-    shadowColor: "#6c4ef5",
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.2,
-    shadowRadius: 16,
-    elevation: 10,
-  },
-  iconSlot: {
-    height: TAB_ICON_SIZE,
-    width: TAB_ICON_SIZE,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  inactiveLabel: {
-    color: colors.neutral.textSecondary,
-  },
-  inner: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    borderRadius: 30,
-    backgroundColor: "#ffffff",
-    paddingHorizontal: TAB_BAR_HORIZONTAL_PADDING,
-    paddingTop: 8,
-    paddingBottom: 8,
-    boxShadow: "0 -4px 20px rgba(17, 24, 39, 0.08)",
-    shadowColor: "#1b1f3b",
-    shadowOffset: { width: 0, height: -4 },
-    shadowOpacity: 0.06,
-    shadowRadius: 16,
-    elevation: 12,
-  },
-  label: {
-    fontFamily: fontFamily.medium,
-    fontSize: 12,
-    lineHeight: 14,
-  },
-  shell: {
-    backgroundColor: "#fbfbfd",
-    borderTopWidth: 0,
-    paddingHorizontal: 16,
-    paddingTop: 4,
-  },
-  tabButton: {
-    flex: 1,
-    height: TAB_BUTTON_HEIGHT,
-    alignItems: "center",
-    justifyContent: "center",
-    zIndex: 1,
-  },
-  tabContent: {
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 6,
-  },
-});

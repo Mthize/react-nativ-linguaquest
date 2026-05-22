@@ -10,12 +10,34 @@ import { useEffect, useRef } from "react";
 import { PostHogProvider, posthog } from "@/lib/posthog";
 
 const publishableKey = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY!;
+const SAFE_SCREEN_PARAM_KEYS = ["page", "lang", "utm_source"] as const;
 
 if (!publishableKey) {
   throw new Error("Add EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY to your .env file");
 }
 
 SplashScreen.preventAutoHideAsync();
+
+function getSafeScreenParams(
+  params: Record<string, string | string[] | undefined>,
+) {
+  const safeParams: Record<string, string> = {};
+
+  for (const key of SAFE_SCREEN_PARAM_KEYS) {
+    const value = params[key];
+
+    if (typeof value === "string" && value.length > 0) {
+      safeParams[key] = value.trim();
+      continue;
+    }
+
+    if (Array.isArray(value) && typeof value[0] === "string" && value[0].length > 0) {
+      safeParams[key] = value[0].trim();
+    }
+  }
+
+  return safeParams;
+}
 
 export default function RootLayout() {
   const [fontsLoaded, fontError] = useFonts({
@@ -37,9 +59,11 @@ export default function RootLayout() {
 
   useEffect(() => {
     if (previousPathname.current !== pathname) {
+      const safeParams = getSafeScreenParams(params);
+
       posthog.screen(pathname, {
         previous_screen: previousPathname.current ?? null,
-        ...params,
+        ...safeParams,
       });
       previousPathname.current = pathname;
     }

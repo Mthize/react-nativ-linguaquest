@@ -1,6 +1,6 @@
 # PostHog post-wizard report
 
-The wizard has completed a deep integration of PostHog analytics into the LinguaQuest Expo app. The `posthog-react-native` SDK was installed alongside its required Expo peer dependencies (`expo-file-system`, `expo-application`, `expo-device`, `expo-localization`). A central PostHog client was created in `lib/posthog.ts`, the `PostHogProvider` was added to the root layout with manual screen tracking for Expo Router, and targeted event captures were added to six screens covering the full user journey from onboarding through to active learning. User identification via `posthog.identify()` is performed on both email and SSO sign-up and sign-in completions.
+The wizard has completed a deep integration of PostHog analytics into the LinguaQuest Expo app. The `posthog-react-native` SDK was installed alongside its required Expo peer dependencies (`expo-file-system`, `expo-application`, `expo-device`, `expo-localization`). A central PostHog client was created in `lib/posthog.tsx`, the `PostHogProvider` was added to the root layout with manual screen tracking for Expo Router, and targeted event captures were added to six screens covering the full user journey from onboarding through to active learning. User identification via `posthog.identify()` is performed on both email and SSO sign-up and sign-in completions.
 
 | Event | Description | File |
 |---|---|---|

@@ -10,7 +10,7 @@ To link events to specific users, call `identify`:
 
 PostHog AI
 
-### Web
+## Web identify example
 
 ```javascript
 posthog.identify(
@@ -19,7 +19,7 @@ posthog.identify(
 );
 ```
 
-### Android
+## Android identify example
 
 ```kotlin
 PostHog.identify(
@@ -32,14 +32,14 @@ PostHog.identify(
 )
 ```
 
-### iOS
+## iOS identify example
 
 ```swift
 PostHogSDK.shared.identify("distinct_id", // Replace "distinct_id" with your user's unique identifier
                            userProperties: ["name": "Max Hedgehog", "email": "max@hedgehogmail.com"]) // optional: set additional person properties
 ```
 
-### React Native
+## React Native identify example
 
 ```jsx
 posthog.identify('distinct_id', { // Replace "distinct_id" with your user's unique identifier
@@ -48,7 +48,7 @@ posthog.identify('distinct_id', { // Replace "distinct_id" with your user's uniq
 })
 ```
 
-### Dart
+## Dart identify example
 
 ```dart
 await Posthog().identify(
@@ -114,31 +114,31 @@ You can do that like so:
 
 PostHog AI
 
-### Web
+#### Web reset example
 
 ```javascript
 posthog.reset()
 ```
 
-### iOS
+#### iOS reset example
 
 ```swift
 PostHogSDK.shared.reset()
 ```
 
-### Android
+#### Android reset example
 
 ```kotlin
 PostHog.reset()
 ```
 
-### React Native
+#### React Native reset example
 
 ```jsx
 posthog.reset()
 ```
 
-### Dart
+#### Dart reset example
 
 ```dart
 Posthog().reset()
@@ -168,7 +168,7 @@ See our [person properties docs](/docs/product-analytics/person-properties.md) f
 
 ### 5\. Use deep links between platforms
 
-We recommend you call `identify` [as soon as you're able](#1-call-identify-as-soon-as-youre-able), typically when a user signs up or logs in.
+We recommend you call `identify` [as soon as you're able](#1-call-identify-as-soon-as-youre-able-to), typically when a user signs up or logs in.
 
 This doesn't work if one or both platforms are unauthenticated. Some examples of such cases are:
 
@@ -191,7 +191,7 @@ Here's an example implementation for handling deep links from web to mobile:
 
 PostHog AI
 
-### iOS
+#### iOS deep link example
 
 ```swift
 import PostHog
@@ -225,7 +225,7 @@ class DeepLinkIdentityManager {
 }
 ```
 
-### Android
+#### Android deep link example
 
 ```kotlin
 import android.net.Uri
