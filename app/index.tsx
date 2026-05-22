@@ -3,31 +3,26 @@ import { Redirect } from "expo-router";
 import { useEffect, useState } from "react";
 import { ActivityIndicator, View } from "react-native";
 
-import { colors } from "@/constants/theme";
 import { useLanguageStore } from "@/store/languageStore";
 
 export default function Index() {
   const { isSignedIn, isLoaded } = useAuth();
-  const selectedLanguage = useLanguageStore((state) => state.selectedLanguage);
+  const { selectedLanguage } = useLanguageStore();
   const [languageHydrated, setLanguageHydrated] = useState(
-    useLanguageStore.persist.hasHydrated(),
+    useLanguageStore.persist.hasHydrated()
   );
 
   useEffect(() => {
-    if (useLanguageStore.persist.hasHydrated()) {
-      setLanguageHydrated(true);
-      return;
-    }
-
+    if (languageHydrated) return;
     return useLanguageStore.persist.onFinishHydration(() =>
-      setLanguageHydrated(true),
+      setLanguageHydrated(true)
     );
-  }, []);
+  }, [languageHydrated]);
 
   if (!isLoaded || !languageHydrated) {
     return (
-      <View className="flex-1 items-center justify-center">
-        <ActivityIndicator size="large" color={colors.primary.purple} />
+      <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
+        <ActivityIndicator size="large" color="#6c4ef5" />
       </View>
     );
   }

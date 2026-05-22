@@ -1,4 +1,4 @@
-import CustomTabBar from "@/components/custom-tab-bar";
+import TabBar from "@/components/TabBar";
 import { Ionicons } from "@expo/vector-icons";
 import { Tabs } from "expo-router";
 
@@ -10,7 +10,7 @@ export default function TabLayout() {
         sceneStyle: { backgroundColor: "#ffffff" },
         tabBarHideOnKeyboard: true,
       }}
-      tabBar={(props) => <CustomTabBar {...props} />}
+      tabBar={(props) => <TabBar {...props} />}
     >
       <Tabs.Screen
         name="home"
