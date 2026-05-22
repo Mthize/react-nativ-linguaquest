@@ -16,7 +16,7 @@ const ACTIVE_INDICATOR_SIZE = 52;
 const TAB_BAR_HORIZONTAL_PADDING = 8;
 const TAB_ICON_SIZE = 22;
 
-export default function CustomTabBar({
+export default function TabBar({
   state,
   descriptors,
   navigation,
