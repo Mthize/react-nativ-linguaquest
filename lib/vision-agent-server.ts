@@ -1,9 +1,19 @@
 const DEFAULT_VISION_AGENT_SERVER_URL = "http://127.0.0.1:8000";
 
 export function getVisionAgentServerUrl() {
-  return (
-    process.env.VISION_AGENT_SERVER_URL?.trim() || DEFAULT_VISION_AGENT_SERVER_URL
-  );
+  const configuredUrl = process.env.VISION_AGENT_SERVER_URL?.trim();
+
+  if (configuredUrl) {
+    return configuredUrl;
+  }
+
+  if (process.env.NODE_ENV === "production") {
+    throw new Error(
+      "VISION_AGENT_SERVER_URL must be set in production for Vision Agent requests.",
+    );
+  }
+
+  return DEFAULT_VISION_AGENT_SERVER_URL;
 }
 
 export function createVisionAgentServerUrl(pathname: string) {

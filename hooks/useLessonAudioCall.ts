@@ -16,6 +16,7 @@ import {
   type LessonAudioCallPhase,
   type LessonAudioSessionResponse,
 } from "@/lib/lesson-audio";
+import { createBackendUrl } from "@/lib/backend-url";
 import type { Language, Lesson } from "@/types/learning";
 
 type UseLessonAudioCallParams = {
@@ -90,6 +91,7 @@ export function useLessonAudioCall({
   const clientRef = useRef<StreamVideoClient | null>(null);
   const agentSessionRef = useRef<LessonAudioAgentSessionResponse | null>(null);
   const isEndingRef = useRef(false);
+  const isStartingRef = useRef(false);
 
   useEffect(() => {
     callRef.current = call;
@@ -198,6 +200,10 @@ export function useLessonAudioCall({
       return;
     }
 
+    if (isStartingRef.current) {
+      return;
+    }
+
     if (!isAuthLoaded) {
       setError("Your account is still loading. Try again in a moment.");
       setPhase("error");
@@ -218,24 +224,27 @@ export function useLessonAudioCall({
       return;
     }
 
-    const clerkToken = await getToken();
-
-    if (!clerkToken) {
-      setError("Unable to verify your session for this audio lesson.");
-      setPhase("error");
-      return;
-    }
-
-    setError(null);
-    setPhase("loading");
-    setAgentConnectionError(null);
-    setAgentConnectionStatus("idle");
-    isEndingRef.current = false;
+    isStartingRef.current = true;
+    let clerkToken: string | null = null;
 
     try {
+      clerkToken = await getToken();
+
+      if (!clerkToken) {
+        setError("Unable to verify your session for this audio lesson.");
+        setPhase("error");
+        return;
+      }
+
+      setError(null);
+      setPhase("loading");
+      setAgentConnectionError(null);
+      setAgentConnectionStatus("idle");
+      isEndingRef.current = false;
+
       await cleanupActiveSession(clerkToken);
 
-      const response = await fetch("/api/stream/session", {
+      const response = await fetch(createBackendUrl("api/stream/session"), {
         body: JSON.stringify({
           languageCode: language.code,
           lessonId: lesson.id,
@@ -287,7 +296,9 @@ export function useLessonAudioCall({
       setAgentConnectionStatus("connecting");
 
       try {
-        const agentResponse = await fetch("/api/stream/agent/start", {
+        const agentResponse = await fetch(
+          createBackendUrl("api/stream/agent/start"),
+          {
           body: JSON.stringify({
             callId: nextSession.callId,
             callType: nextSession.callType,
@@ -297,7 +308,8 @@ export function useLessonAudioCall({
             "Content-Type": "application/json",
           },
           method: "POST",
-        });
+          },
+        );
 
         if (!agentResponse.ok) {
           const failure = (await agentResponse.json().catch(() => null)) as
@@ -332,6 +344,8 @@ export function useLessonAudioCall({
           : "Unable to join the Stream audio room.",
       );
       setPhase("error");
+    } finally {
+      isStartingRef.current = false;
     }
   }
 
@@ -392,7 +406,9 @@ export function useLessonAudioCall({
 
       if (clerkToken) {
         await fetch(
-          `/api/stream/agent/${encodeURIComponent(activeAgentSession.callId)}/${encodeURIComponent(activeAgentSession.sessionId)}`,
+          createBackendUrl(
+            `api/stream/agent/${encodeURIComponent(activeAgentSession.callId)}/${encodeURIComponent(activeAgentSession.sessionId)}`,
+          ),
           {
             headers: { Authorization: `Bearer ${clerkToken}` },
             method: "DELETE",

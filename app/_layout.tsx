@@ -12,6 +12,7 @@ import { PostHogProvider } from "posthog-react-native";
 import { useEffect, useRef } from "react";
 
 const publishableKey = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY!;
+const safeScreenParamKeys = ["page", "ref", "category"] as const;
 
 if (!publishableKey) {
   throw new Error("Add EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY to your .env file");
@@ -44,6 +45,17 @@ export default function RootLayout() {
 
   const pathname = usePathname();
   const params = useGlobalSearchParams();
+  const safeParams = safeScreenParamKeys.reduce<
+    Record<string, string | string[]>
+  >((acc, key) => {
+    const value = params[key];
+
+    if (value !== undefined) {
+      acc[key] = value;
+    }
+
+    return acc;
+  }, {});
   const previousPathname = useRef<string | undefined>(undefined);
 
   useEffect(() => {
@@ -56,11 +68,11 @@ export default function RootLayout() {
     if (previousPathname.current !== pathname) {
       posthog.screen(pathname, {
         previous_screen: previousPathname.current ?? null,
-        ...params,
+        ...safeParams,
       });
       previousPathname.current = pathname;
     }
-  }, [pathname, params]);
+  }, [pathname, safeParams]);
 
   if (!fontsLoaded && !fontError) {
     return null;

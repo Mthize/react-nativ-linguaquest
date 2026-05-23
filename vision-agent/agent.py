@@ -37,6 +37,7 @@ DEFAULT_MAX_CONCURRENT_SESSIONS = int(
 DEFAULT_MAX_SESSION_DURATION_SECONDS = int(
     os.getenv("VISION_AGENT_MAX_SESSION_DURATION_SECONDS", "1800"),
 )
+DEFAULT_ALLOWED_ORIGINS = ["http://localhost:3000"]
 
 
 def ensure_required_env() -> None:
@@ -51,6 +52,17 @@ def ensure_required_env() -> None:
             f"Missing required environment variable(s): {joined}. "
             f"Add them to {PARENT_ENV_PATH}.",
         )
+
+
+def get_allowed_origins() -> list[str]:
+    configured_origins = os.getenv("AGENT_ALLOWED_ORIGINS", "")
+    origins = [
+        origin.strip()
+        for origin in configured_origins.split(",")
+        if origin.strip()
+    ]
+
+    return origins or DEFAULT_ALLOWED_ORIGINS
 
 
 def first_value(*values: Any) -> str | None:
@@ -353,8 +365,8 @@ def create_runner() -> Runner:
     ensure_required_env()
 
     serve_options = ServeOptions(
-        cors_allow_origins=["*"],
-        cors_allow_headers=["*"],
+        cors_allow_origins=get_allowed_origins(),
+        cors_allow_headers=["Content-Type", "Authorization"],
         cors_allow_methods=["GET", "POST", "DELETE"],
     )
 

@@ -100,15 +100,15 @@ export default function LearnScreen() {
         contentContainerStyle={styles.scrollContent}
       >
         {/* Hero Section */}
-        <View style={styles.heroContainer}>
+        <View className="mb-5 h-[180px] overflow-hidden rounded-[20px] bg-white">
           <Image
             source={images.palace}
             contentFit="contain"
-            style={styles.heroImage}
+            className="h-full w-full"
           />
           <Image
             source={images.mascotWelcome}
-            style={styles.mascotImage}
+            className="absolute bottom-0 right-4 h-[110px] w-[110px]"
             contentFit="contain"
           />
         </View>
@@ -152,23 +152,5 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingHorizontal: 20,
     paddingBottom: 100,
-  },
-  heroContainer: {
-    height: 180,
-    borderRadius: 20,
-    overflow: "hidden",
-    marginBottom: 20,
-    backgroundColor: "#ffffff",
-  },
-  heroImage: {
-    width: "100%",
-    height: "100%",
-  },
-  mascotImage: {
-    position: "absolute",
-    bottom: 0,
-    right: 16,
-    width: 110,
-    height: 110,
   },
 });

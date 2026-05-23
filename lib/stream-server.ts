@@ -21,9 +21,18 @@ export async function verifyClerkRequestUserId(request: Request) {
     );
   }
 
-  const payload = await verifyToken(token, {
-    secretKey: getRequiredEnv("CLERK_SECRET_KEY"),
-  });
+  let payload: Awaited<ReturnType<typeof verifyToken>>;
+
+  try {
+    payload = await verifyToken(token, {
+      secretKey: getRequiredEnv("CLERK_SECRET_KEY"),
+    });
+  } catch {
+    throw new Response("Unauthorized: invalid or expired token", {
+      status: 401,
+    });
+  }
+
   const clerkUserId = payload?.sub;
 
   if (typeof clerkUserId !== "string" || clerkUserId.length === 0) {
