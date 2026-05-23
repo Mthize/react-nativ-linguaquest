@@ -34,7 +34,8 @@ export default function LessonScreen() {
   const hasTrackedStartRef = useRef(false);
   const hasTrackedAbandonmentRef = useRef(false);
   const hasLessonFinishedRef = useRef(false);
-  const lastQuestionIndexRef = useRef(0);
+  const lastQuestionIndexRef = useRef(-1);
+  const startedLessonIdRef = useRef<string | null>(null);
 
   const {
     agentConnectionError,
@@ -65,26 +66,28 @@ export default function LessonScreen() {
   });
 
   useEffect(() => {
-    if (!lessonId) {
-      return;
-    }
-
-    lessonStartTimeRef.current = Date.now();
-    hasTrackedStartRef.current = false;
-    hasTrackedAbandonmentRef.current = false;
-    hasLessonFinishedRef.current = false;
-    lastQuestionIndexRef.current = lessonActivityCount > 0 ? 0 : -1;
-  }, [lessonActivityCount, lessonId]);
-
-  useEffect(() => {
     if (phase === "ended") {
       hasLessonFinishedRef.current = true;
     }
   }, [phase]);
 
+  const initializeLessonTracking = useCallback(() => {
+    lessonStartTimeRef.current = Date.now();
+    hasTrackedStartRef.current = false;
+    hasTrackedAbandonmentRef.current = false;
+    hasLessonFinishedRef.current = false;
+    lastQuestionIndexRef.current = getDisplayedQuestionIndex(lessonActivityCount);
+    startedLessonIdRef.current = lessonId ?? null;
+  }, [lessonActivityCount, lessonId]);
+
   const captureLessonAbandoned = useCallback(() => {
+    if (phase === "ended") {
+      hasLessonFinishedRef.current = true;
+    }
+
     if (
       !lesson ||
+      startedLessonIdRef.current !== lesson.id ||
       !hasTrackedStartRef.current ||
       hasTrackedAbandonmentRef.current ||
       hasLessonFinishedRef.current
@@ -96,15 +99,21 @@ export default function LessonScreen() {
     const timeIntoLessonSeconds = startedAt
       ? Math.max(0, Math.floor((Date.now() - startedAt) / 1000))
       : 0;
+    const lastQuestionIndex =
+      lessonActivityCount > 0
+        ? Math.min(lastQuestionIndexRef.current, lessonActivityCount - 1)
+        : -1;
+
+    lastQuestionIndexRef.current = lastQuestionIndex;
 
     posthog.capture("lesson_abandoned", {
       lesson_id: lesson.id,
       time_into_lesson_seconds: timeIntoLessonSeconds,
-      last_question_index: lastQuestionIndexRef.current,
+      last_question_index: lastQuestionIndex,
     });
 
     hasTrackedAbandonmentRef.current = true;
-  }, [lesson]);
+  }, [lesson, lessonActivityCount, phase]);
 
   useEffect(() => {
     if (!isLoaded || !isSignedIn || !lesson || !language) {
@@ -115,7 +124,8 @@ export default function LessonScreen() {
       return;
     }
 
-    if (!hasTrackedStartRef.current) {
+    if (startedLessonIdRef.current !== lesson.id || !hasTrackedStartRef.current) {
+      initializeLessonTracking();
       posthog.capture("lesson_started", {
         lesson_id: lesson.id,
         language: language.code,
@@ -125,7 +135,16 @@ export default function LessonScreen() {
     }
 
     void startOrJoinCall();
-  }, [isLoaded, isSignedIn, language, lesson, lessonNumber, phase, startOrJoinCall]);
+  }, [
+    initializeLessonTracking,
+    isLoaded,
+    isSignedIn,
+    language,
+    lesson,
+    lessonNumber,
+    phase,
+    startOrJoinCall,
+  ]);
 
   useEffect(() => {
     return () => {
@@ -174,4 +193,8 @@ export default function LessonScreen() {
       teacherCaption={teacherCaption}
     />
   );
+}
+
+function getDisplayedQuestionIndex(activityCount: number) {
+  return activityCount > 0 ? 0 : -1;
 }

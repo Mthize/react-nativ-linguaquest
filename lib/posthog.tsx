@@ -29,13 +29,13 @@ const noopPostHog: PostHogClientMethods = {
   screen: noopAsync,
 };
 
-const sdkClient = isPostHogEnabled
+const sdkClient: PostHog | PostHogClientMethods = isPostHogEnabled
   ? new PostHog(posthogProjectToken!, {
       host: posthogHost,
     })
-  : (noopPostHog as unknown as PostHog);
+  : noopPostHog;
 
-export const posthog: PostHog = sdkClient;
+export const posthog: PostHogClientMethods = sdkClient;
 
 export function PostHogProvider({
   children,

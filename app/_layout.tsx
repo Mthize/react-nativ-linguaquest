@@ -1,13 +1,12 @@
 import "../global.css";
 
-import { posthog } from "@/lib/posthog";
+import { PostHogProvider, posthog } from "@/lib/posthog";
 import { useLanguageStore } from "@/store/languageStore";
 import { ClerkProvider, useUser } from "@clerk/expo";
 import { tokenCache } from "@clerk/expo/token-cache";
 import { useFonts } from "expo-font";
 import { Stack, useGlobalSearchParams, usePathname } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
-import { PostHogProvider } from "posthog-react-native";
 import { useEffect, useRef } from "react";
 
 const publishableKey = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY!;
@@ -80,7 +79,6 @@ export default function RootLayout() {
 
   return (
     <PostHogProvider
-      client={posthog}
       autocapture={{
         captureScreens: true,
         captureTouches: true,

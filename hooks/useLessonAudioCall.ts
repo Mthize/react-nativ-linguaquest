@@ -109,10 +109,15 @@ export function useLessonAudioCall({
 
   const cleanupActiveSession = useCallback(async (authToken?: string | null) => {
     if (isListeningRef.current) {
+      isListeningRef.current = false;
       setIsListening(false);
     }
 
-    await setSpeakerOutputMuted(false);
+    try {
+      await setSpeakerOutputMuted(false);
+    } catch {
+      // Continue tearing down the call even if speaker mute state cannot be reset.
+    }
 
     const activeAgentSession = agentSessionRef.current;
 
@@ -518,6 +523,7 @@ export function useLessonAudioCall({
     }
 
     setError(null);
+    isListeningRef.current = true;
     setIsListening(true);
 
     try {
@@ -528,6 +534,7 @@ export function useLessonAudioCall({
       }
     } catch (holdError) {
       await setSpeakerOutputMuted(false);
+      isListeningRef.current = false;
       setIsListening(false);
       setError(
         holdError instanceof Error
@@ -542,6 +549,7 @@ export function useLessonAudioCall({
       return;
     }
 
+    isListeningRef.current = false;
     setIsListening(false);
 
     try {
@@ -555,7 +563,11 @@ export function useLessonAudioCall({
           : "Unable to release the microphone right now.",
       );
     } finally {
-      await setSpeakerOutputMuted(false);
+      try {
+        await setSpeakerOutputMuted(false);
+      } catch {
+        // Do not block microphone teardown if speaker mute reset fails.
+      }
     }
   }
 

@@ -1,6 +1,8 @@
+import { useEffect, useState } from "react";
 import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import {
+  AccessibilityInfo,
   Pressable,
   StyleSheet,
   Text,
@@ -37,6 +39,7 @@ type AudioLessonScreenProps = {
   sessionId?: string | null;
   sessionEnded: boolean;
   teacherCaption?: LessonAudioLiveCaption | null;
+  accessibilityModeEnabled?: boolean;
   onBack: () => void;
   onEndCall: () => void;
   onMicPressIn: () => void;
@@ -66,11 +69,14 @@ export default function AudioLessonScreen({
   sessionId,
   sessionEnded,
   teacherCaption,
+  accessibilityModeEnabled,
   onBack,
   onEndCall,
   onMicPressIn,
   onMicPressOut,
 }: AudioLessonScreenProps) {
+  const [isAccessibilityModeDetected, setIsAccessibilityModeDetected] =
+    useState(false);
   const teacherName = getTeacherName(lesson.aiTeacherPrompt.systemPrompt);
   const status = getStatus(
     audioCallPhase,
@@ -101,6 +107,8 @@ export default function AudioLessonScreen({
     audioCallPhase !== "joined" && audioCallPhase !== "ended";
   const canHoldToSpeak = audioCallPhase === "joined";
   const listeningLabel = isListening ? "Listening..." : "Hold to speak";
+  const isAccessibilityModeEnabled =
+    accessibilityModeEnabled ?? isAccessibilityModeDetected;
   const sessionShortId = sessionId?.slice(-6).toUpperCase() ?? null;
   const responseStatusText = getResponseStatusText(audioCallPhase, Boolean(audioCallError));
   const learnerCaptionText =
@@ -110,6 +118,61 @@ export default function AudioLessonScreen({
       : sessionShortId
         ? `Session ${sessionShortId} • ${captionLine}`
         : captionLine);
+
+  useEffect(() => {
+    if (accessibilityModeEnabled !== undefined) {
+      return;
+    }
+
+    let isMounted = true;
+
+    const updateAccessibilityMode = async () => {
+      try {
+        const [isScreenReaderEnabled, isAccessibilityServiceEnabled] =
+          await Promise.all([
+            AccessibilityInfo.isScreenReaderEnabled(),
+            AccessibilityInfo.isAccessibilityServiceEnabled().catch(() => false),
+          ]);
+
+        if (isMounted) {
+          setIsAccessibilityModeDetected(
+            isScreenReaderEnabled || isAccessibilityServiceEnabled,
+          );
+        }
+      } catch {
+        if (isMounted) {
+          setIsAccessibilityModeDetected(false);
+        }
+      }
+    };
+
+    void updateAccessibilityMode();
+
+    const subscription = AccessibilityInfo.addEventListener(
+      "screenReaderChanged",
+      () => {
+        void updateAccessibilityMode();
+      },
+    );
+
+    return () => {
+      isMounted = false;
+      subscription.remove();
+    };
+  }, [accessibilityModeEnabled]);
+
+  const handleAccessibleMicPress = () => {
+    if (!canHoldToSpeak) {
+      return;
+    }
+
+    if (isListening) {
+      onMicPressOut();
+      return;
+    }
+
+    onMicPressIn();
+  };
 
   return (
     <SafeAreaView
@@ -308,9 +371,20 @@ export default function AudioLessonScreen({
 
         <View className="mb-5 mt-[18px] items-center px-5">
           <Pressable
+            accessibilityHint="Activates the microphone so you can start or stop speaking."
+            accessibilityLabel={listeningLabel}
+            accessibilityRole="button"
+            accessible
             disabled={!canHoldToSpeak}
-            onPressIn={onMicPressIn}
-            onPressOut={onMicPressOut}
+            onPress={
+              isAccessibilityModeEnabled ? handleAccessibleMicPress : undefined
+            }
+            onPressIn={
+              isAccessibilityModeEnabled ? undefined : onMicPressIn
+            }
+            onPressOut={
+              isAccessibilityModeEnabled ? undefined : onMicPressOut
+            }
             style={({ pressed }) => [
               styles.micButton,
               !canHoldToSpeak && styles.micButtonDisabled,
