@@ -16,6 +16,14 @@ import {
 } from "@/lib/stream-server";
 import type { Language } from "@/types/learning";
 
+const LESSON_CAPTIONS_SETTINGS = {
+  language: "auto",
+  speech_segment_config: {
+    max_speech_caption_ms: 1800,
+    silence_duration_ms: 400,
+  },
+} as const;
+
 export async function POST(request: Request) {
   try {
     const clerkUserId = await verifyClerkRequestUserId(request);
@@ -75,6 +83,12 @@ export async function POST(request: Request) {
           { user_id: clerkUserId },
           { role: VISION_AGENT_CALL_MEMBER_ROLE, user_id: VISION_AGENT_USER_ID },
         ],
+        settings_override: {
+          transcription: {
+            closed_caption_mode: "available",
+            ...LESSON_CAPTIONS_SETTINGS,
+          },
+        },
         video: false,
       },
       video: false,
@@ -92,6 +106,8 @@ export async function POST(request: Request) {
       await call.goLive();
     }
 
+    const captions = await startLessonCaptions(call);
+
     const token = streamClient.generateUserToken({ user_id: clerkUserId });
 
     return Response.json({
@@ -99,6 +115,8 @@ export async function POST(request: Request) {
       callCid: createdCall.call.cid,
       callId,
       callType: STREAM_AUDIO_CALL_TYPE,
+      captionsEnabled: captions.enabled,
+      captionsError: captions.error,
       created: createdCall.created,
       createdAt: createdCall.call.created_at.toISOString(),
       languageCode: language.code,
@@ -150,4 +168,30 @@ function buildLessonCustomData({
     teacherName,
     teacherPrompt: lesson.aiTeacherPrompt,
   };
+}
+
+async function startLessonCaptions(call: {
+  startClosedCaptions: (request?: {
+    language?: "auto";
+    speech_segment_config?: {
+      max_speech_caption_ms?: number;
+      silence_duration_ms?: number;
+    };
+  }) => Promise<unknown>;
+}) {
+  try {
+    await call.startClosedCaptions(LESSON_CAPTIONS_SETTINGS);
+
+    return {
+      enabled: true,
+      error: null,
+    } as const;
+  } catch (error) {
+    console.error("Failed to start Stream lesson captions", error);
+
+    return {
+      enabled: false,
+      error: "Live captions are unavailable for this audio lesson right now.",
+    } as const;
+  }
 }

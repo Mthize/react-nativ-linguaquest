@@ -1,12 +1,20 @@
 import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
-import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import {
+  Pressable,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { images } from "@/constants/images";
 import {
+  type LessonAudioCaptionsStatus,
   type LessonAudioAgentConnectionStatus,
   type LessonAudioCallPhase,
+  type LessonAudioLiveCaption,
   getTeacherName,
 } from "@/lib/lesson-audio";
 import { colors } from "@/constants/theme";
@@ -19,19 +27,20 @@ type AudioLessonScreenProps = {
   audioCallPhase: LessonAudioCallPhase;
   audioCallUserImageUrl?: string | null;
   audioCallUserName: string;
+  captionsError?: string | null;
+  captionsStatus: LessonAudioCaptionsStatus;
+  isListening: boolean;
   language: Language;
+  learnerCaption?: LessonAudioLiveCaption | null;
   lesson: Lesson;
   micEnabled: boolean;
-  previewVisible: boolean;
   sessionId?: string | null;
   sessionEnded: boolean;
-  subtitlesEnabled: boolean;
+  teacherCaption?: LessonAudioLiveCaption | null;
   onBack: () => void;
   onEndCall: () => void;
-  onStartOrJoinCall: () => void;
-  onToggleMic: () => void;
-  onTogglePreview: () => void;
-  onToggleSubtitles: () => void;
+  onMicPressIn: () => void;
+  onMicPressOut: () => void;
 };
 
 const FEEDBACK_ITEMS = [
@@ -47,22 +56,28 @@ export default function AudioLessonScreen({
   audioCallPhase,
   audioCallUserImageUrl,
   audioCallUserName,
+  captionsError,
+  captionsStatus,
+  isListening,
   language,
+  learnerCaption,
   lesson,
   micEnabled,
-  previewVisible,
   sessionId,
   sessionEnded,
-  subtitlesEnabled,
+  teacherCaption,
   onBack,
   onEndCall,
-  onStartOrJoinCall,
-  onToggleMic,
-  onTogglePreview,
-  onToggleSubtitles,
+  onMicPressIn,
+  onMicPressOut,
 }: AudioLessonScreenProps) {
   const teacherName = getTeacherName(lesson.aiTeacherPrompt.systemPrompt);
-  const status = getStatus(audioCallPhase, Boolean(audioCallError), micEnabled);
+  const status = getStatus(
+    audioCallPhase,
+    Boolean(audioCallError),
+    micEnabled,
+    isListening,
+  );
   const agentStatus = getAgentStatus(agentConnectionStatus);
   const responseText = getResponseText({
     audioCallError,
@@ -71,18 +86,30 @@ export default function AudioLessonScreen({
     teacherName,
   });
   const teacherPreviewText =
-    lesson.aiTeacherPrompt.introMessage || responseText || `${teacherName} is ready.`;
+    teacherCaption?.text.trim() ||
+    lesson.aiTeacherPrompt.introMessage ||
+    responseText ||
+    `${teacherName} is ready.`;
   const firstPhrase = lesson.phrases[0];
   const secondPhrase = lesson.phrases[1];
-  const captionLine = subtitlesEnabled
-    ? [firstPhrase?.text, secondPhrase?.text].filter(Boolean).join("  •  ")
-    : lesson.goals[0]?.description ?? lesson.title;
+  const captionLine =
+    [firstPhrase?.text, secondPhrase?.text].filter(Boolean).join("  •  ") ||
+    lesson.goals[0]?.description ||
+    lesson.title;
+  const captionStatus = getCaptionStatus(captionsStatus);
   const controlButtonsDisabled =
     audioCallPhase !== "joined" && audioCallPhase !== "ended";
+  const canHoldToSpeak = audioCallPhase === "joined";
+  const listeningLabel = isListening ? "Listening..." : "Hold to speak";
   const sessionShortId = sessionId?.slice(-6).toUpperCase() ?? null;
   const responseStatusText = getResponseStatusText(audioCallPhase, Boolean(audioCallError));
-  const bubbleDisabled =
-    audioCallPhase === "loading" || audioCallPhase === "connecting";
+  const learnerCaptionText =
+    learnerCaption?.text.trim() ||
+    (captionsStatus === "live"
+      ? "Your speech captions will appear here as you talk."
+      : sessionShortId
+        ? `Session ${sessionShortId} • ${captionLine}`
+        : captionLine);
 
   return (
     <SafeAreaView
@@ -117,13 +144,29 @@ export default function AudioLessonScreen({
             </View>
           </View>
 
-          <View className="flex-row gap-2.5">
-            <HeaderAction iconName="videocam-outline" />
-            <HeaderAction
-              label={`${lesson.phrases.length + lesson.goals.length + 7}`}
+          <TouchableOpacity
+            activeOpacity={0.9}
+            className={`h-11 flex-row items-center justify-center rounded-full px-4 ${
+              controlButtonsDisabled ? "bg-[#f1f2f6]" : "bg-[#ff5a5f]"
+            }`}
+            disabled={controlButtonsDisabled}
+            onPress={onEndCall}
+            style={{ opacity: controlButtonsDisabled ? 0.58 : 1 }}
+          >
+            <Ionicons
+              color={controlButtonsDisabled ? "#9096aa" : "#ffffff"}
+              name="call"
+              size={18}
+              style={styles.endCallIcon}
             />
-            <HeaderAction iconName="notifications-outline" />
-          </View>
+            <Text
+              className={`ml-2 font-poppins-semibold text-[13px] leading-4 ${
+                controlButtonsDisabled ? "text-[#9096aa]" : "text-white"
+              }`}
+            >
+              End Call
+            </Text>
+          </TouchableOpacity>
         </View>
 
         <View className="relative min-h-0 flex-1 overflow-hidden rounded-[34px] bg-[#dcd1c4]">
@@ -153,20 +196,18 @@ export default function AudioLessonScreen({
             </Text>
           </View>
 
-          {previewVisible ? (
-            <View className="absolute right-4 top-6 w-[130px] rounded-[22px] border-2 border-white bg-[rgba(255,255,255,0.86)] px-2 pb-2.5 pt-2">
-              <View className="h-[116px] items-center justify-center overflow-hidden rounded-[16px] bg-[#ebe8f8]">
-                <Image
-                  className="h-[104px] w-[104px]"
-                  contentFit="contain"
-                  source={images.mascotWelcome}
-                />
-              </View>
-              <Text className="mt-2 text-center font-poppins-semibold text-[13px] leading-4 text-text-primary">
-                {teacherName}
-              </Text>
+          <View className="absolute right-4 top-6 w-[130px] rounded-[22px] border-2 border-white bg-[rgba(255,255,255,0.86)] px-2 pb-2.5 pt-2">
+            <View className="h-[116px] items-center justify-center overflow-hidden rounded-[16px] bg-[#ebe8f8]">
+              <Image
+                className="h-[104px] w-[104px]"
+                contentFit="contain"
+                source={images.mascotWelcome}
+              />
             </View>
-          ) : null}
+            <Text className="mt-2 text-center font-poppins-semibold text-[13px] leading-4 text-text-primary">
+              {teacherName}
+            </Text>
+          </View>
 
           <Image
             className="absolute bottom-[168px] left-3 h-[390px] w-[300px]"
@@ -174,16 +215,11 @@ export default function AudioLessonScreen({
             source={images.mascotAuth}
           />
 
-          <TouchableOpacity
-            activeOpacity={0.92}
-            className="absolute bottom-[72px] left-[18px] right-[30px] rounded-[24px] bg-white px-[18px] py-[14px]"
-            disabled={bubbleDisabled}
-            onPress={onStartOrJoinCall}
-          >
+          <View className="absolute bottom-[72px] left-[18px] right-[30px] rounded-[24px] bg-white px-[18px] py-[14px]">
             <View className="flex-row items-center gap-3">
               <View className="min-w-0 flex-1">
                 <Text
-                  numberOfLines={1}
+                  numberOfLines={3}
                   className="font-poppins-semibold text-[15px] leading-5 text-text-primary"
                 >
                   {teacherPreviewText}
@@ -205,9 +241,25 @@ export default function AudioLessonScreen({
                   </Text>
                 </View>
 
+                <View className="mt-2 flex-row items-center gap-2">
+                  <View
+                    className="h-2.5 w-2.5 rounded-full"
+                    style={{ backgroundColor: captionStatus.color }}
+                  />
+                  <Text className="font-poppins-medium text-[12px] leading-4 text-[#6b7280]">
+                    Live captions {captionStatus.label}
+                  </Text>
+                </View>
+
                 {agentConnectionStatus === "failed" && agentConnectionError ? (
                   <Text className="mt-2 font-poppins-medium text-[12px] leading-4 text-[#d64545]">
                     {agentConnectionError}
+                  </Text>
+                ) : null}
+
+                {captionsStatus === "failed" && captionsError ? (
+                  <Text className="mt-2 font-poppins-medium text-[12px] leading-4 text-[#d64545]">
+                    {captionsError}
                   </Text>
                 ) : null}
               </View>
@@ -244,43 +296,49 @@ export default function AudioLessonScreen({
                   {audioCallUserName}
                 </Text>
                 <Text
-                  numberOfLines={1}
+                  numberOfLines={2}
                   className="font-poppins-medium text-[12px] leading-4 text-[#8c93ac]"
                 >
-                  {sessionShortId
-                    ? `Session ${sessionShortId} • ${captionLine}`
-                    : captionLine}
+                  {learnerCaptionText}
                 </Text>
               </View>
             </View>
-          </TouchableOpacity>
+          </View>
         </View>
 
-        <View className="mb-4 mt-[18px] flex-row justify-between px-2">
-          <CallButton
-            disabled={audioCallPhase === "loading" || audioCallPhase === "connecting"}
-            iconName="videocam"
-            label="Camera"
-            onPress={onTogglePreview}
-          />
-          <CallButton
-            disabled={controlButtonsDisabled}
-            iconName={micEnabled ? "mic" : "mic-off"}
-            label="Mic"
-            onPress={onToggleMic}
-          />
-          <CallButton
-            iconName="language"
-            label="Subtitles"
-            onPress={onToggleSubtitles}
-          />
-          <CallButton
-            disabled={controlButtonsDisabled}
-            danger
-            iconName="call"
-            label="End Call"
-            onPress={onEndCall}
-          />
+        <View className="mb-5 mt-[18px] items-center px-5">
+          <Pressable
+            disabled={!canHoldToSpeak}
+            onPressIn={onMicPressIn}
+            onPressOut={onMicPressOut}
+            style={({ pressed }) => [
+              styles.micButton,
+              !canHoldToSpeak && styles.micButtonDisabled,
+              (isListening || pressed) && canHoldToSpeak
+                ? styles.micButtonActive
+                : null,
+            ]}
+          >
+            <View
+              style={[
+                styles.micButtonInner,
+                (isListening || !canHoldToSpeak) && styles.micButtonInnerMuted,
+              ]}
+            >
+              <Ionicons
+                color={isListening && canHoldToSpeak ? "#ffffff" : colors.primary.purple}
+                name={isListening && canHoldToSpeak ? "radio" : "mic"}
+                size={42}
+              />
+            </View>
+          </Pressable>
+
+          <Text className="mt-4 font-poppins-semibold text-[18px] leading-6 text-text-primary">
+            {listeningLabel}
+          </Text>
+          <Text className="mt-1 text-center font-poppins-medium text-[13px] leading-[18px] text-[#8a90a8]">
+            Press and hold to speak.
+          </Text>
         </View>
 
         <View className="mb-3 rounded-[30px] border border-[#ece8fb] bg-[#faf7ff] px-3 py-5">
@@ -312,68 +370,6 @@ export default function AudioLessonScreen({
   );
 }
 
-function HeaderAction({
-  iconName,
-  label,
-}: {
-  iconName?: keyof typeof Ionicons.glyphMap;
-  label?: string;
-}) {
-  return (
-    <View className="h-12 w-12 items-center justify-center rounded-[24px] border border-[#ececf5] bg-white">
-      {label ? (
-        <Text className="font-poppins-semibold text-[18px] leading-5 text-text-primary">
-          {label}
-        </Text>
-      ) : (
-        <Ionicons
-          color={colors.neutral.textPrimary}
-          name={iconName ?? "ellipse-outline"}
-          size={20}
-        />
-      )}
-    </View>
-  );
-}
-
-function CallButton({
-  disabled = false,
-  danger = false,
-  iconName,
-  label,
-  onPress,
-}: {
-  disabled?: boolean;
-  danger?: boolean;
-  iconName: keyof typeof Ionicons.glyphMap;
-  label: string;
-  onPress: () => void;
-}) {
-  return (
-    <View className="flex-1 items-center">
-      <TouchableOpacity
-        activeOpacity={0.9}
-        className={`mb-2 h-[78px] w-[78px] items-center justify-center rounded-full ${
-          danger ? "bg-[#ff4747]" : "bg-white"
-        }`}
-        disabled={disabled}
-        onPress={onPress}
-        style={{ opacity: disabled ? 0.48 : 1 }}
-      >
-        <Ionicons
-          color={danger ? "#ffffff" : "#0d1b52"}
-          name={iconName}
-          size={28}
-          style={danger ? styles.endCallIcon : null}
-        />
-      </TouchableOpacity>
-      <Text className="font-poppins-medium text-[13px] leading-[18px] text-[#8a90a8]">
-        {label}
-      </Text>
-    </View>
-  );
-}
-
 function getResponseText({
   audioCallError,
   audioCallPhase,
@@ -399,7 +395,7 @@ function getResponseText({
     case "ended":
       return `Great work with ${lessonTitle}. Start again whenever you're ready.`;
     default:
-      return `Tap start to begin this live audio lesson with ${teacherName}.`;
+      return `${teacherName} is getting your audio lesson ready.`;
   }
 }
 
@@ -423,13 +419,14 @@ function getResponseStatusText(
     return "Audio lesson in progress 🎧";
   }
 
-  return "Tap the lesson card to start";
+  return "Audio lesson in progress";
 }
 
 function getStatus(
   audioCallPhase: LessonAudioCallPhase,
   hasError: boolean,
   micEnabled: boolean,
+  isListening: boolean,
 ) {
   if (hasError || audioCallPhase === "error") {
     return { color: colors.semantic.error, label: "Error" };
@@ -444,9 +441,13 @@ function getStatus(
   }
 
   if (audioCallPhase === "joined") {
+    if (isListening) {
+      return { color: colors.primary.purple, label: "Listening" };
+    }
+
     return micEnabled
       ? { color: colors.semantic.success, label: "Joined" }
-      : { color: colors.semantic.warning, label: "Muted" };
+      : { color: colors.semantic.success, label: "Ready to speak" };
   }
 
   if (audioCallPhase === "ended") {
@@ -471,8 +472,56 @@ function getAgentStatus(
   }
 }
 
+function getCaptionStatus(captionsStatus: LessonAudioCaptionsStatus) {
+  switch (captionsStatus) {
+    case "starting":
+      return { color: colors.semantic.warning, label: "starting" };
+    case "live":
+      return { color: colors.semantic.success, label: "on" };
+    case "failed":
+      return { color: colors.semantic.error, label: "unavailable" };
+    default:
+      return { color: colors.neutral.textSecondary, label: "idle" };
+  }
+}
+
 const styles = StyleSheet.create({
   endCallIcon: {
     transform: [{ rotate: "135deg" }],
+  },
+  micButton: {
+    alignItems: "center",
+    backgroundColor: "#ffffff",
+    borderColor: "#ebe6fb",
+    borderRadius: 64,
+    borderWidth: 1,
+    elevation: 6,
+    height: 128,
+    justifyContent: "center",
+    shadowColor: "#4d2fb8",
+    shadowOffset: { width: 0, height: 18 },
+    shadowOpacity: 0.12,
+    shadowRadius: 24,
+    width: 128,
+  },
+  micButtonActive: {
+    backgroundColor: colors.primary.purple,
+    borderColor: colors.primary.purple,
+    shadowOpacity: 0.22,
+    transform: [{ scale: 1.02 }],
+  },
+  micButtonDisabled: {
+    opacity: 0.55,
+  },
+  micButtonInner: {
+    alignItems: "center",
+    backgroundColor: "#f3efff",
+    borderRadius: 46,
+    height: 92,
+    justifyContent: "center",
+    width: 92,
+  },
+  micButtonInnerMuted: {
+    backgroundColor: "rgba(255,255,255,0.18)",
   },
 });

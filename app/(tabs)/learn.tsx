@@ -104,12 +104,12 @@ export default function LearnScreen() {
           <Image
             source={images.palace}
             contentFit="contain"
-            className="h-full w-full"
+            style={styles.heroPalace}
           />
           <Image
             source={images.mascotWelcome}
-            className="absolute bottom-0 right-4 h-[110px] w-[110px]"
             contentFit="contain"
+            style={styles.heroMascot}
           />
         </View>
 
@@ -149,6 +149,23 @@ export default function LearnScreen() {
 }
 
 const styles = StyleSheet.create({
+  heroMascot: {
+    bottom: 4,
+    height: 116,
+    position: "absolute",
+    right: 18,
+    width: 116,
+    zIndex: 2,
+  },
+  heroPalace: {
+    alignSelf: "center",
+    bottom: -2,
+    height: 170,
+    left: 0,
+    position: "absolute",
+    right: 0,
+    width: "100%",
+  },
   scrollContent: {
     paddingHorizontal: 20,
     paddingBottom: 100,

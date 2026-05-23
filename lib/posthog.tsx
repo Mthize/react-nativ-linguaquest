@@ -17,9 +17,12 @@ if (!isPostHogEnabled && __DEV__) {
 
 const noopAsync = async () => undefined;
 
-type PostHogClient = Pick<PostHog, "capture" | "flush" | "identify" | "screen">;
+type PostHogClientMethods = Pick<
+  PostHog,
+  "capture" | "flush" | "identify" | "screen"
+>;
 
-const noopPostHog: PostHogClient = {
+const noopPostHog: PostHogClientMethods = {
   capture: noopAsync,
   flush: noopAsync,
   identify: () => undefined,
@@ -30,9 +33,9 @@ const sdkClient = isPostHogEnabled
   ? new PostHog(posthogProjectToken!, {
       host: posthogHost,
     })
-  : noopPostHog;
+  : (noopPostHog as unknown as PostHog);
 
-export const posthog: PostHogClient = sdkClient;
+export const posthog: PostHog = sdkClient;
 
 export function PostHogProvider({
   children,

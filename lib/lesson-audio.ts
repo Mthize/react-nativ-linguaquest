@@ -25,6 +25,21 @@ export type LessonAudioAgentConnectionStatus =
   | "connected"
   | "failed";
 
+export type LessonAudioCaptionsStatus =
+  | "idle"
+  | "starting"
+  | "live"
+  | "failed";
+
+export type LessonAudioLiveCaption = {
+  endTime: string;
+  id: string;
+  speakerId: string;
+  speakerName: string;
+  startTime: string;
+  text: string;
+};
+
 export type LessonAudioSessionRequest = {
   lessonId: Lesson["id"];
   languageCode?: Language["code"];
@@ -50,6 +65,8 @@ export type LessonAudioSessionResponse = {
   callCid: string;
   callId: string;
   callType: string;
+  captionsEnabled: boolean;
+  captionsError?: string | null;
   created: boolean;
   createdAt: string;
   languageCode: Language["code"];
