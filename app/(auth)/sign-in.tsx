@@ -64,9 +64,6 @@ export default function SignInScreen() {
       return;
     }
     if (signIn.status === "complete") {
-      posthog.identify(email, {
-        $set: { email },
-      });
       posthog.capture("sign_in_completed", { method: "email" });
       await signIn.finalize({
         navigate: ({ decorateUrl }) => {

@@ -1,4 +1,5 @@
 import {
+  useCallback,
   useEffect,
   useRef,
   useState,
@@ -11,10 +12,13 @@ import type {
 import type { Subscription } from "rxjs";
 
 import {
+  type LessonAudioCaptionsStatus,
   type LessonAudioAgentConnectionStatus,
   type LessonAudioAgentSessionResponse,
   type LessonAudioCallPhase,
+  type LessonAudioLiveCaption,
   type LessonAudioSessionResponse,
+  VISION_AGENT_USER_ID,
 } from "@/lib/lesson-audio";
 import { createBackendUrl } from "@/lib/backend-url";
 import type { Language, Lesson } from "@/types/learning";
@@ -75,6 +79,7 @@ export function useLessonAudioCall({
     CALLING_STATE.IDLE,
   );
   const [error, setError] = useState<string | null>(null);
+  const [isListening, setIsListening] = useState(false);
   const [muted, setMuted] = useState(false);
   const [phase, setPhase] = useState<LessonAudioCallPhase>("idle");
   const [session, setSession] = useState<LessonAudioSessionResponse | null>(
@@ -85,13 +90,75 @@ export function useLessonAudioCall({
   );
   const [agentConnectionStatus, setAgentConnectionStatus] =
     useState<LessonAudioAgentConnectionStatus>("idle");
+  const [captionsError, setCaptionsError] = useState<string | null>(null);
+  const [captionsStatus, setCaptionsStatus] =
+    useState<LessonAudioCaptionsStatus>("idle");
+  const [learnerCaption, setLearnerCaption] =
+    useState<LessonAudioLiveCaption | null>(null);
+  const [teacherCaption, setTeacherCaption] =
+    useState<LessonAudioLiveCaption | null>(null);
   const [agentSession, setAgentSession] =
     useState<LessonAudioAgentSessionResponse | null>(null);
   const callRef = useRef<Call | null>(null);
   const clientRef = useRef<StreamVideoClient | null>(null);
   const agentSessionRef = useRef<LessonAudioAgentSessionResponse | null>(null);
+  const getTokenRef = useRef(getToken);
+  const isListeningRef = useRef(false);
   const isEndingRef = useRef(false);
   const isStartingRef = useRef(false);
+
+  const cleanupActiveSession = useCallback(async (authToken?: string | null) => {
+    if (isListeningRef.current) {
+      isListeningRef.current = false;
+      setIsListening(false);
+    }
+
+    try {
+      await setSpeakerOutputMuted(false);
+    } catch {
+      // Continue tearing down the call even if speaker mute state cannot be reset.
+    }
+
+    const activeAgentSession = agentSessionRef.current;
+
+    if (activeAgentSession) {
+      const clerkToken =
+        authToken ?? (await getTokenRef.current().catch(() => null));
+
+      if (clerkToken) {
+        await fetch(
+          createBackendUrl(
+            `api/stream/agent/${encodeURIComponent(activeAgentSession.callId)}/${encodeURIComponent(activeAgentSession.sessionId)}`,
+          ),
+          {
+            headers: { Authorization: `Bearer ${clerkToken}` },
+            method: "DELETE",
+          },
+        ).catch(() => undefined);
+      }
+    }
+
+    const activeCall = callRef.current ?? clientRef.current?.state.calls[0];
+
+    if (activeCall) {
+      await activeCall.leave().catch(() => undefined);
+    }
+
+    if (clientRef.current) {
+      await clientRef.current.disconnectUser().catch(() => undefined);
+    }
+
+    setCall(null);
+    setClient(null);
+    setSession(null);
+    setAgentSession(null);
+    setAgentConnectionError(null);
+    setAgentConnectionStatus("idle");
+    setCaptionsError(null);
+    setCaptionsStatus("idle");
+    setLearnerCaption(null);
+    setTeacherCaption(null);
+  }, []);
 
   useEffect(() => {
     callRef.current = call;
@@ -104,6 +171,14 @@ export function useLessonAudioCall({
   useEffect(() => {
     agentSessionRef.current = agentSession;
   }, [agentSession]);
+
+  useEffect(() => {
+    getTokenRef.current = getToken;
+  }, [getToken]);
+
+  useEffect(() => {
+    isListeningRef.current = isListening;
+  }, [isListening]);
 
   useEffect(() => {
     if (!enabled) {
@@ -123,26 +198,76 @@ export function useLessonAudioCall({
           setMuted(status !== "enabled");
         }),
       );
+      subscriptions.push(
+        call.state.captioning$.subscribe((isCaptioning) => {
+          setCaptionsStatus((currentStatus) => {
+            if (isCaptioning) {
+              return "live";
+            }
+
+            if (currentStatus === "failed") {
+              return currentStatus;
+            }
+
+            return session?.captionsEnabled ? "starting" : "idle";
+          });
+        }),
+      );
+      subscriptions.push(
+        call.state.closedCaptions$.subscribe((captions) => {
+          const nextTeacherCaption = getLatestCaptionForSpeaker(
+            captions,
+            VISION_AGENT_USER_ID,
+          );
+          const nextLearnerCaption = getLatestCaptionForSpeaker(
+            captions,
+            session?.user.id ?? userId ?? "",
+          );
+
+          if (nextTeacherCaption) {
+            setTeacherCaption((currentCaption) =>
+              shouldReplaceCaption(currentCaption, nextTeacherCaption)
+                ? nextTeacherCaption
+                : currentCaption,
+            );
+          }
+
+          if (nextLearnerCaption) {
+            setLearnerCaption((currentCaption) =>
+              shouldReplaceCaption(currentCaption, nextLearnerCaption)
+                ? nextLearnerCaption
+                : currentCaption,
+            );
+          }
+        }),
+      );
     } else {
       setCallingState(CALLING_STATE.IDLE);
+      setIsListening(false);
       setMuted(false);
+      setCaptionsStatus("idle");
     }
 
     return () => {
       subscriptions.forEach((subscription) => subscription.unsubscribe());
     };
-  }, [call, enabled]);
+  }, [call, enabled, session, userId]);
 
   useEffect(() => {
     if (!enabled) {
       setCallingState(CALLING_STATE.IDLE);
       setError(null);
+      setIsListening(false);
       setMuted(false);
       setPhase("idle");
       setSession(null);
       setAgentConnectionError(null);
       setAgentConnectionStatus("idle");
       setAgentSession(null);
+      setCaptionsError(null);
+      setCaptionsStatus("idle");
+      setLearnerCaption(null);
+      setTeacherCaption(null);
       return;
     }
 
@@ -184,16 +309,30 @@ export function useLessonAudioCall({
     }
 
     setError(null);
+    setIsListening(false);
     setPhase("idle");
     setSession(null);
     setAgentConnectionError(null);
     setAgentConnectionStatus("idle");
     setAgentSession(null);
+    setCaptionsError(null);
+    setCaptionsStatus("idle");
+    setLearnerCaption(null);
+    setTeacherCaption(null);
 
     return () => {
       void cleanupActiveSession();
     };
-  }, [enabled, language.code, lesson.id]);
+  }, [cleanupActiveSession, enabled, language.code, lesson.id]);
+
+  useEffect(() => {
+    if (phase === "joined" || !isListeningRef.current) {
+      return;
+    }
+
+    setIsListening(false);
+    void setSpeakerOutputMuted(false);
+  }, [phase]);
 
   async function startOrJoinCall() {
     if (!enabled) {
@@ -285,12 +424,24 @@ export function useLessonAudioCall({
       );
 
       setSession(nextSession);
+      setCaptionsError(nextSession.captionsError ?? null);
+      setCaptionsStatus(
+        nextSession.captionsEnabled
+          ? "starting"
+          : nextSession.captionsError
+            ? "failed"
+            : "idle",
+      );
+      setLearnerCaption(null);
+      setTeacherCaption(null);
       setClient(nextClient);
       setCall(nextCall);
       setPhase("connecting");
 
       await nextCall.join();
       await nextCall.camera.disable().catch(() => undefined);
+      await nextCall.microphone.disable().catch(() => undefined);
+      await setSpeakerOutputMuted(false);
       setPhase("joined");
 
       setAgentConnectionStatus("connecting");
@@ -366,6 +517,60 @@ export function useLessonAudioCall({
     }
   }
 
+  async function startHoldToTalk() {
+    if (!callRef.current || phase !== "joined" || isListeningRef.current) {
+      return;
+    }
+
+    setError(null);
+    isListeningRef.current = true;
+    setIsListening(true);
+
+    try {
+      await setSpeakerOutputMuted(true);
+
+      if (callRef.current.microphone.state.status !== "enabled") {
+        await callRef.current.microphone.enable();
+      }
+    } catch (holdError) {
+      await setSpeakerOutputMuted(false);
+      isListeningRef.current = false;
+      setIsListening(false);
+      setError(
+        holdError instanceof Error
+          ? holdError.message
+          : "Unable to activate the microphone right now.",
+      );
+    }
+  }
+
+  async function stopHoldToTalk() {
+    if (!callRef.current || !isListeningRef.current) {
+      return;
+    }
+
+    isListeningRef.current = false;
+    setIsListening(false);
+
+    try {
+      if (callRef.current.microphone.state.status === "enabled") {
+        await callRef.current.microphone.disable();
+      }
+    } catch (holdError) {
+      setError(
+        holdError instanceof Error
+          ? holdError.message
+          : "Unable to release the microphone right now.",
+      );
+    } finally {
+      try {
+        await setSpeakerOutputMuted(false);
+      } catch {
+        // Do not block microphone teardown if speaker mute reset fails.
+      }
+    }
+  }
+
   async function endCall() {
     if (!callRef.current && !clientRef.current && !agentSessionRef.current) {
       setPhase("ended");
@@ -398,58 +603,28 @@ export function useLessonAudioCall({
     }
   }
 
-  async function cleanupActiveSession(authToken?: string | null) {
-    const activeAgentSession = agentSessionRef.current;
-
-    if (activeAgentSession) {
-      const clerkToken = authToken ?? (await getToken().catch(() => null));
-
-      if (clerkToken) {
-        await fetch(
-          createBackendUrl(
-            `api/stream/agent/${encodeURIComponent(activeAgentSession.callId)}/${encodeURIComponent(activeAgentSession.sessionId)}`,
-          ),
-          {
-            headers: { Authorization: `Bearer ${clerkToken}` },
-            method: "DELETE",
-          },
-        ).catch(() => undefined);
-      }
-    }
-
-    const activeCall = callRef.current ?? clientRef.current?.state.calls[0];
-
-    if (activeCall) {
-      await activeCall.leave().catch(() => undefined);
-    }
-
-    if (clientRef.current) {
-      await clientRef.current.disconnectUser().catch(() => undefined);
-    }
-
-    setCall(null);
-    setClient(null);
-    setSession(null);
-    setAgentSession(null);
-    setAgentConnectionError(null);
-    setAgentConnectionStatus("idle");
-  }
-
   return {
     agentConnectionError,
     agentConnectionStatus,
     agentSession,
     call,
     callingState,
+    captionsError,
+    captionsStatus,
     client,
     endCall,
     error,
+    isListening,
     isJoined: phase === "joined",
     isStarting: phase === "loading" || phase === "connecting",
+    learnerCaption,
     muted,
     phase,
     session,
+    startHoldToTalk,
     startOrJoinCall,
+    stopHoldToTalk,
+    teacherCaption,
     toggleMute,
   };
 }
@@ -457,4 +632,71 @@ export function useLessonAudioCall({
 async function loadStreamVideoModule() {
   streamVideoModulePromise ??= import("@stream-io/video-react-native-sdk");
   return streamVideoModulePromise;
+}
+
+async function setSpeakerOutputMuted(muted: boolean) {
+  const { callManager } = await loadStreamVideoModule();
+
+  if (!callManager?.speaker || typeof callManager.speaker.setMute !== "function") {
+    return;
+  }
+
+  // Mute teacher playback while the learner is holding the mic to reduce echo.
+  callManager.speaker.setMute(muted);
+}
+
+type StreamClosedCaption = {
+  end_time: string;
+  id: string;
+  speaker_id: string;
+  start_time: string;
+  text: string;
+  user?: {
+    id?: string;
+    name?: string;
+  } | null;
+};
+
+function getLatestCaptionForSpeaker(
+  captions: StreamClosedCaption[],
+  speakerId: string,
+) {
+  if (!speakerId) {
+    return null;
+  }
+
+  const match = [...captions]
+    .reverse()
+    .find(
+      (caption) =>
+        caption.user?.id === speakerId || caption.speaker_id === speakerId,
+    );
+
+  if (!match) {
+    return null;
+  }
+
+  return {
+    endTime: match.end_time,
+    id: match.id,
+    speakerId: match.user?.id ?? match.speaker_id,
+    speakerName: match.user?.name?.trim() || "Speaker",
+    startTime: match.start_time,
+    text: match.text.trim(),
+  } satisfies LessonAudioLiveCaption;
+}
+
+function shouldReplaceCaption(
+  currentCaption: LessonAudioLiveCaption | null,
+  nextCaption: LessonAudioLiveCaption,
+) {
+  if (!currentCaption) {
+    return true;
+  }
+
+  if (currentCaption.id !== nextCaption.id) {
+    return true;
+  }
+
+  return currentCaption.startTime !== nextCaption.startTime;
 }

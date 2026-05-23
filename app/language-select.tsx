@@ -108,7 +108,7 @@ export default function LanguageSelectScreen() {
           testID="language-confirm-button"
           onPress={() => {
             const lang = LANGUAGES.find((l) => l.code === selectedCode);
-            posthog.capture("language_confirmed", {
+            posthog.capture("language_selected", {
               language_code: selectedCode,
               language_name: lang?.name ?? selectedCode,
             });

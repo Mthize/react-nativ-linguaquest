@@ -67,10 +67,6 @@ export default function SignUpScreen() {
       return;
     }
     if (signUp.status === "complete") {
-      posthog.identify(signUp.emailAddress ?? email, {
-        $set: { email: signUp.emailAddress ?? email },
-        $set_once: { first_sign_up_date: new Date().toISOString() },
-      });
       posthog.capture("sign_up_completed", { method: "email" });
       await signUp.finalize({
         navigate: ({ decorateUrl }) => {
