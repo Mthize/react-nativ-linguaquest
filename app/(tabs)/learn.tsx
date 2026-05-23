@@ -1,10 +1,7 @@
-import AudioLessonScreen from "@/components/audio-lesson-screen";
 import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
-import { useLocalSearchParams, useRouter } from "expo-router";
-import { useState } from "react";
+import { useRouter } from "expo-router";
 import {
-  Image as RNImage,
   ScrollView,
   StyleSheet,
   Text,
@@ -16,23 +13,16 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { LessonCard } from "@/components/LessonCard";
 import { images } from "@/constants/images";
 import { colors } from "@/constants/theme";
-import { LANGUAGES } from "@/data/languages";
 import { LESSONS } from "@/data/lessons";
 import { UNITS } from "@/data/units";
 import { useLanguageStore } from "@/store/languageStore";
+import { useLearningStore } from "@/store/learningStore";
 import { Lesson } from "@/types/learning";
-import { useLearningStore } from "../../store/learningStore";
 
 export default function LearnScreen() {
   const router = useRouter();
-  const { lessonId } = useLocalSearchParams<{ lessonId?: string | string[] }>();
   const { selectedLanguage } = useLanguageStore();
   const { completedLessonIds } = useLearningStore();
-  const [previewVisible, setPreviewVisible] = useState(true);
-  const [micEnabled, setMicEnabled] = useState(true);
-  const [subtitlesEnabled, setSubtitlesEnabled] = useState(true);
-  const [sessionEnded, setSessionEnded] = useState(false);
-  const selectedLessonId = Array.isArray(lessonId) ? lessonId[0] : lessonId;
 
   const unit = UNITS.find((u) => u.languageCode === selectedLanguage);
   const lessons = unit
@@ -48,17 +38,6 @@ export default function LearnScreen() {
   const inProgressIndex = lessons.findIndex(
     (l) => !completedLessonIds.includes(l.id)
   );
-  const selectedLesson = selectedLessonId
-    ? LESSONS.find((lesson) => lesson.id === selectedLessonId)
-    : null;
-  const selectedLessonUnit = selectedLesson
-    ? UNITS.find((entry) => entry.id === selectedLesson.unitId)
-    : null;
-  const selectedLessonLanguage = selectedLessonUnit
-    ? LANGUAGES.find(
-        (language) => language.code === selectedLessonUnit.languageCode
-      )
-    : null;
 
   if (!selectedLanguage || !unit) {
     return (
@@ -72,24 +51,6 @@ export default function LearnScreen() {
           </Text>
         </View>
       </SafeAreaView>
-    );
-  }
-
-  if (selectedLesson && selectedLessonLanguage) {
-    return (
-      <AudioLessonScreen
-        language={selectedLessonLanguage}
-        lesson={selectedLesson}
-        micEnabled={micEnabled}
-        previewVisible={previewVisible}
-        sessionEnded={sessionEnded}
-        subtitlesEnabled={subtitlesEnabled}
-        onBack={() => router.replace("/learn")}
-        onEndCall={() => setSessionEnded(true)}
-        onToggleMic={() => setMicEnabled((current) => !current)}
-        onTogglePreview={() => setPreviewVisible((current) => !current)}
-        onToggleSubtitles={() => setSubtitlesEnabled((current) => !current)}
-      />
     );
   }
 
@@ -134,23 +95,23 @@ export default function LearnScreen() {
         </Text>
       </View>
 
-        <ScrollView
-          showsVerticalScrollIndicator={false}
-          contentContainerStyle={styles.scrollContent}
-        >
-          {/* Hero Section */}
-          <View className="mb-5 h-[180px] overflow-hidden rounded-[20px] bg-white">
-            <Image
-              source={images.palace}
-              contentFit="contain"
-              className="h-full w-full"
-            />
-            <RNImage
-              source={images.mascotWelcome}
-              className="absolute bottom-0 right-4 h-[110px] w-[110px]"
-              resizeMode="contain"
-            />
-          </View>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.scrollContent}
+      >
+        {/* Hero Section */}
+        <View className="mb-5 h-[180px] overflow-hidden rounded-[20px] bg-white">
+          <Image
+            source={images.palace}
+            contentFit="contain"
+            className="h-full w-full"
+          />
+          <Image
+            source={images.mascotWelcome}
+            className="absolute bottom-0 right-4 h-[110px] w-[110px]"
+            contentFit="contain"
+          />
+        </View>
 
         {/* Lessons / Practice tabs */}
         <View className="flex-row border-b border-border mb-5">
@@ -178,16 +139,7 @@ export default function LearnScreen() {
                 !completedLessonIds.includes(lesson.id) &&
                 index === inProgressIndex
               }
-              onPress={() => {
-                setPreviewVisible(true);
-                setMicEnabled(true);
-                setSubtitlesEnabled(true);
-                setSessionEnded(false);
-                router.push({
-                  pathname: "/learn",
-                  params: { lessonId: lesson.id },
-                });
-              }}
+              onPress={() => router.push(`/lesson/${lesson.id}`)}
             />
           ))}
         </View>

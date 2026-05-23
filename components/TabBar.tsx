@@ -66,7 +66,6 @@ export default function TabBar({
         className="relative flex-row items-center justify-between rounded-[30px] bg-white px-2 py-2"
         onLayout={handleBarLayout}
         style={{
-          boxShadow: "0 -4px 20px rgba(17, 24, 39, 0.08)",
           shadowColor: "#1b1f3b",
           shadowOffset: { width: 0, height: -4 },
           shadowOpacity: 0.06,
@@ -79,7 +78,6 @@ export default function TabBar({
             className="absolute left-0 top-[11px] h-[52px] w-[52px] rounded-full bg-lingua-purple"
             pointerEvents="none"
             style={{
-              boxShadow: "0 14px 28px rgba(108, 78, 245, 0.28)",
               shadowColor: "#6c4ef5",
               shadowOffset: { width: 0, height: 10 },
               shadowOpacity: 0.2,
